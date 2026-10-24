@@ -32,10 +32,21 @@
       "expo-router"
     ],
     "updates": {
-      "url": "https://u.expo.dev/placeholder-project-id"
+      "url": "https://u.expo.dev/a06632e4-b847-442b-9d3b-d71e101462a6"
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "a06632e4-b847-442b-9d3b-d71e101462a6"
+      }
+    },
+    "owner": "adk113"
   }
 }
