@@ -32,7 +32,7 @@
       "expo-router"
     ],
     "updates": {
-      "url": "https://u.expo.dev/a06632e4-b847-442b-9d3b-d71e101462a6"
+      "url": "https://u.expo.dev/dd902338-e397-4b69-8268-c12afdd38f6a"
     },
     "runtimeVersion": {
       "policy": "appVersion"
@@ -44,9 +44,9 @@
         }
       },
       "eas": {
-        "projectId": "a06632e4-b847-442b-9d3b-d71e101462a6"
+        "projectId": "dd902338-e397-4b69-8268-c12afdd38f6a"
       }
     },
-    "owner": "adk113"
+    "owner": "adk_113"
   }
 }
