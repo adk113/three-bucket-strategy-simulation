@@ -1,4 +1,4 @@
-import { HISTORICAL_BENCHMARKS } from './historicalData';
+import { COUNTRY_PROFILES, calculateBlendedBucket3 } from './historicalData';
 import { SimulationInputs, YearSimulationResult } from './types';
 
 export function calculateInitialSplit(inputs: SimulationInputs) {
@@ -35,7 +35,6 @@ export function calculateInitialSplit(inputs: SimulationInputs) {
 
 export function parseStartCalendarYear(dateStr: string): number {
   if (!dateStr) return new Date().getFullYear();
-  // Check DD/MM/YYYY
   if (dateStr.includes('/')) {
     const parts = dateStr.split('/');
     if (parts.length === 3 && parts[2].length === 4) {
@@ -43,7 +42,6 @@ export function parseStartCalendarYear(dateStr: string): number {
       if (!isNaN(yr)) return yr;
     }
   }
-  // Check YYYY-MM-DD
   if (dateStr.includes('-')) {
     const parts = dateStr.split('-');
     if (parts.length === 3 && parts[0].length === 4) {
@@ -65,15 +63,26 @@ export function runDeterministicSimulation(
 
   const startYear = parseStartCalendarYear(inputs.startDate);
   const inflationDec = inputs.inflationRate / 100;
+  const frictionRate = (inputs.rebalancingFrictionRate || 0.15) / 100;
+
+  const horizon = Math.max(10, Math.min(60, inputs.simulationHorizon || 30));
+
+  const countryProfile = COUNTRY_PROFILES[inputs.baseCountry || 'IN'] || COUNTRY_PROFILES.IN;
+  const blendedB3 = calculateBlendedBucket3(
+    inputs.baseCountry || 'IN',
+    inputs.foreignCountry || 'US',
+    inputs.foreignAllocationPercent || 0
+  );
 
   const results: YearSimulationResult[] = [];
   let isDepleted = false;
 
-  for (let year = 1; year <= 30; year++) {
+  for (let year = 1; year <= horizon; year++) {
     const calendarYear = startYear + year - 1;
 
-    // Withdrawal amount for year t (adjusted for cumulative inflation)
+    // Year t withdrawal indexed to inflation: W_t = W_0 * (1 + i)^(t - 1)
     const withdrawalAmount = inputs.monthlyWithdrawal * 12 * Math.pow(1 + inflationDec, year - 1);
+    const realPurchasingPower = Math.round(withdrawalAmount / Math.pow(1 + inflationDec, year - 1));
 
     if (isDepleted || b1 + b2 + b3 <= 0) {
       isDepleted = true;
@@ -84,18 +93,21 @@ export function runDeterministicSimulation(
         bucket2: 0,
         bucket3: 0,
         totalCorpus: 0,
-        withdrawalAmount,
+        withdrawalAmount: Math.round(withdrawalAmount),
+        realPurchasingPower,
         bucket1RefilledFromB2: 0,
         bucket2RefilledFromB3: 0,
+        rebalanceFrictionCost: 0,
+        bearMarketDefenseActive: false,
         isDepleted: true,
         marketReturnB3: 0,
       });
       continue;
     }
 
-    // Step 1: Debit living expenses from Bucket 1
+    // Step 1: Debit living expense from Bucket 1
     let needed = withdrawalAmount;
-    let b1Paid = Math.min(b1, needed);
+    const b1Paid = Math.min(b1, needed);
     b1 -= b1Paid;
     needed -= b1Paid;
 
@@ -112,7 +124,6 @@ export function runDeterministicSimulation(
     }
 
     if (needed > 0) {
-      // Entire portfolio was exhausted by withdrawal
       isDepleted = true;
       b1 = 0;
       b2 = 0;
@@ -133,41 +144,50 @@ export function runDeterministicSimulation(
       r2 = inputs.manualReturns.bucket2 / 100;
       r3 = inputs.manualReturns.bucket3 / 100;
     } else {
-      r1 = HISTORICAL_BENCHMARKS.bucket1.nominalReturnMean / 100;
-      r2 = HISTORICAL_BENCHMARKS.bucket2.nominalReturnMean / 100;
-      r3 = HISTORICAL_BENCHMARKS.bucket3.nominalReturnMean / 100;
+      r1 = countryProfile.bucket1.nominalReturnMean / 100;
+      r2 = countryProfile.bucket2.nominalReturnMean / 100;
+      r3 = blendedB3.blendedReturn / 100;
     }
 
     b1 *= 1 + r1;
     b2 *= 1 + r2;
     b3 *= 1 + r3;
 
-    // Step 3: Waterfall Refill Mechanics
+    // Step 3: Granular Waterfall Refill Mechanics
     const nextYearExpense = withdrawalAmount * (1 + inflationDec);
     const targetB1 = nextYearExpense * inputs.bucket1Years;
     const targetB2 = nextYearExpense * inputs.bucket2Years;
 
     let b1Refill = 0;
     let b2Refill = 0;
+    let totalFriction = 0;
+    let bearMarketDefenseActive = false;
 
-    // Refill Bucket 1 from Bucket 2 if below target
+    // Refill Bucket 1 from Bucket 2 if below target floor
     if (b1 < targetB1 && b2 > 0) {
       const deficit = targetB1 - b1;
       b1Refill = Math.min(b2, deficit);
+      const friction = b1Refill * frictionRate;
+      totalFriction += friction;
       b2 -= b1Refill;
-      b1 += b1Refill;
+      b1 += b1Refill - friction;
     }
 
-    // Refill Bucket 2 from Bucket 3 if below target AND Bucket 3 has positive or neutral performance
+    // Refill Bucket 2 from Bucket 3 if below target
     if (b2 < targetB2 && b3 > 0) {
       const deficit = targetB2 - b2;
-      // Sequence-of-returns protection: if market had a steep negative return (r3 < 0),
-      // we avoid panic-selling Bucket 3 equities, unless Bucket 2 is critically exhausted (< 1 yr).
-      const allowEquityHarvest = r3 >= 0 || b2 < nextYearExpense;
-      if (allowEquityHarvest) {
+      // Sequence-of-Returns Protection:
+      // If equity market had a down year (r3 < 0), protect equities from distress selling!
+      const isBearMarket = r3 < 0;
+      if (isBearMarket && b2 > nextYearExpense * 1.5) {
+        bearMarketDefenseActive = true;
+        // Do not sell equities at a loss; let Bucket 2 absorb the down year
+      } else {
         b2Refill = Math.min(b3, deficit);
+        const friction = b2Refill * frictionRate;
+        totalFriction += friction;
         b3 -= b2Refill;
-        b2 += b2Refill;
+        b2 += b2Refill - friction;
       }
     }
 
@@ -184,8 +204,11 @@ export function runDeterministicSimulation(
       bucket3: Math.round(b3),
       totalCorpus: Math.round(total),
       withdrawalAmount: Math.round(withdrawalAmount),
+      realPurchasingPower,
       bucket1RefilledFromB2: Math.round(b1Refill),
       bucket2RefilledFromB3: Math.round(b2Refill),
+      rebalanceFrictionCost: Math.round(totalFriction),
+      bearMarketDefenseActive,
       isDepleted,
       marketReturnB3: Number((r3 * 100).toFixed(2)),
     });

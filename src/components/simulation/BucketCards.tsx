@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Wallet, ShieldCheck, TrendingUp, Info } from 'lucide-react-native';
+import { Wallet, ShieldCheck, TrendingUp } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { PALETTE } from '../../theme/colors';
+import { SupportedCountry, formatCurrency } from '../../utils/currency';
 
 interface BucketCardsProps {
   initialCorpus: number;
@@ -13,6 +14,7 @@ interface BucketCardsProps {
   };
   b1Years: number;
   b2Years: number;
+  baseCountry?: SupportedCountry;
   onSelectBucket?: (bucketNum: 1 | 2 | 3) => void;
 }
 
@@ -21,6 +23,7 @@ export const BucketCards: React.FC<BucketCardsProps> = ({
   split,
   b1Years,
   b2Years,
+  baseCountry = 'IN',
   onSelectBucket,
 }) => {
   const { colors, theme } = useTheme();
@@ -30,11 +33,7 @@ export const BucketCards: React.FC<BucketCardsProps> = ({
   const p2 = Math.round((split.bucket2 / total) * 100);
   const p3 = Math.max(0, 100 - p1 - p2);
 
-  const formatAmount = (val: number) => {
-    if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)} Cr`;
-    if (val >= 100000) return `₹${(val / 100000).toFixed(2)} Lakh`;
-    return `₹${val.toLocaleString()}`;
-  };
+  const formatAmount = (val: number) => formatCurrency(val, baseCountry);
 
   return (
     <View style={styles.container}>
@@ -120,7 +119,7 @@ export const BucketCards: React.FC<BucketCardsProps> = ({
           <View style={styles.infoRow}>
             <Text style={[styles.infoKey, { color: colors.textMuted }]}>Instruments:</Text>
             <Text style={[styles.infoVal, { color: colors.textSecondary }]}>
-              Liquid Funds, T-Bills
+              {baseCountry === 'IN' ? 'Liquid Funds, T-Bills' : 'T-Bills, Money Market'}
             </Text>
           </View>
         </TouchableOpacity>
@@ -166,7 +165,7 @@ export const BucketCards: React.FC<BucketCardsProps> = ({
           <View style={styles.infoRow}>
             <Text style={[styles.infoKey, { color: colors.textMuted }]}>Instruments:</Text>
             <Text style={[styles.infoVal, { color: colors.textSecondary }]}>
-              Corporate Bonds, SDLs
+              {baseCountry === 'IN' ? 'Corporate Bonds, SDLs' : 'BND, TIPS, Gilts'}
             </Text>
           </View>
         </TouchableOpacity>
@@ -212,7 +211,7 @@ export const BucketCards: React.FC<BucketCardsProps> = ({
           <View style={styles.infoRow}>
             <Text style={[styles.infoKey, { color: colors.textMuted }]}>Instruments:</Text>
             <Text style={[styles.infoVal, { color: colors.textSecondary }]}>
-              Nifty 50, S&P 500
+              {baseCountry === 'IN' ? 'Nifty 50, Flexi-Cap' : 'S&P 500, MSCI World'}
             </Text>
           </View>
         </TouchableOpacity>

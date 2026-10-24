@@ -1,19 +1,18 @@
+import { COUNTRY_PROFILES } from './historicalData';
 import { runDeterministicSimulation } from './simulationEngine';
 import { SimulationInputs } from './types';
 
-/**
- * Calculates a sustainable monthly withdrawal so the corpus theoretically
- * preserves capital across 30 years under inflation and market volatility.
- */
 export function calculateSafeMonthlyWithdrawal(inputs: SimulationInputs): number {
   if (inputs.initialCorpus <= 0) return 0;
 
+  const horizon = Math.max(10, inputs.simulationHorizon || 30);
+  const country = COUNTRY_PROFILES[inputs.baseCountry || 'IN'] || COUNTRY_PROFILES.IN;
+
   // Initial bounds for monthly withdrawal
-  let low = Math.floor((inputs.initialCorpus * 0.015) / 12); // ~1.5% annual
-  let high = Math.floor((inputs.initialCorpus * 0.09) / 12); // ~9.0% annual
+  let low = Math.floor((inputs.initialCorpus * 0.015) / 12);
+  let high = Math.floor((inputs.initialCorpus * 0.09) / 12);
   let bestSafeWithdrawal = low;
 
-  // Binary search across 18 iterations gives precision within < $10 / INR 500
   for (let iter = 0; iter < 18; iter++) {
     const mid = Math.floor((low + high) / 2);
     const testInputs: SimulationInputs = {
@@ -21,26 +20,25 @@ export function calculateSafeMonthlyWithdrawal(inputs: SimulationInputs): number
       monthlyWithdrawal: mid,
     };
 
-    // Run deterministic projection with a conservative safety haircut (2% below mean)
-    const conservativeCustomReturns = Array.from({ length: 30 }, () => ({
-      b1: 0.045, // 4.5% safe cash return
-      b2: 0.065, // 6.5% safe bond return
-      b3: 0.095, // 9.5% safe equity return
+    // Conservative stress haircut (1.5% below historical mean)
+    const conservativeCustomReturns = Array.from({ length: horizon }, () => ({
+      b1: Math.max(0.01, (country.bucket1.nominalReturnMean - 1.2) / 100),
+      b2: Math.max(0.02, (country.bucket2.nominalReturnMean - 1.5) / 100),
+      b3: Math.max(0.04, (country.bucket3.nominalReturnMean - 2.5) / 100),
     }));
 
     const path = runDeterministicSimulation(testInputs, conservativeCustomReturns);
-    const year30Corpus = path[29]?.totalCorpus || 0;
+    const terminalCorpus = path[horizon - 1]?.totalCorpus || 0;
     const isDepleted = path.some((p) => p.isDepleted || p.totalCorpus <= 0);
 
-    // Criteria: Portfolio survives 30 years and terminal corpus is at least 50% of initial corpus (inflation adjusted safety)
-    if (!isDepleted && year30Corpus >= inputs.initialCorpus * 0.5) {
+    if (!isDepleted && terminalCorpus >= inputs.initialCorpus * 0.4) {
       bestSafeWithdrawal = mid;
-      low = mid + 1; // Try higher sustainable withdrawal
+      low = mid + 1;
     } else {
-      high = mid - 1; // Back off
+      high = mid - 1;
     }
   }
 
-  // Round to nearest 500 / 100 for clean display
-  return Math.max(1000, Math.round(bestSafeWithdrawal / 500) * 500);
+  const roundUnit = inputs.baseCountry === 'IN' ? 500 : 50;
+  return Math.max(roundUnit, Math.round(bestSafeWithdrawal / roundUnit) * roundUnit);
 }

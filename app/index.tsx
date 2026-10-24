@@ -13,10 +13,8 @@ import {
   Sun,
   Moon,
   FolderOpen,
-  PieChart,
-  ShieldCheck,
-  Zap,
   RotateCcw,
+  Globe2,
 } from 'lucide-react-native';
 import { useTheme } from '../src/theme/ThemeContext';
 import { SimulationInputs } from '../src/engine/types';
@@ -30,7 +28,7 @@ import { ProjectionChart } from '../src/components/simulation/ProjectionChart';
 import { InsightsPanel } from '../src/components/simulation/InsightsPanel';
 import { StrategyModal } from '../src/components/simulation/StrategyModal';
 import { InstrumentModal } from '../src/components/simulation/InstrumentModal';
-import { PALETTE } from '../src/theme/colors';
+import { COUNTRY_METAS, SupportedCountry } from '../src/utils/currency';
 
 const DEFAULT_INPUTS: SimulationInputs = {
   initialCorpus: 20000000, // ₹2 Crore
@@ -40,6 +38,12 @@ const DEFAULT_INPUTS: SimulationInputs = {
   bucket1Years: 3,
   bucket2Years: 7,
   mode: 'historical',
+  baseCountry: 'IN',
+  foreignCountry: 'US',
+  foreignAllocationPercent: 0,
+  simulationHorizon: 30,
+  displayHorizon: 30,
+  rebalancingFrictionRate: 0.15,
   manualReturns: {
     bucket1: 5.5,
     bucket2: 8.0,
@@ -75,6 +79,8 @@ export default function SimulationDashboard() {
     setInputs(DEFAULT_INPUTS);
   };
 
+  const countryMeta = COUNTRY_METAS[inputs.baseCountry || 'IN'] || COUNTRY_METAS.IN;
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg }]}>
       {/* Top Header */}
@@ -100,11 +106,11 @@ export default function SimulationDashboard() {
                 3-Bucket Strategy
               </Text>
               <View style={[styles.proBadge, { backgroundColor: colors.accent + '25' }]}>
-                <Text style={[styles.proBadgeText, { color: colors.accent }]}>PRO SIM</Text>
+                <Text style={[styles.proBadgeText, { color: colors.accent }]}>GLOBAL V2</Text>
               </View>
             </View>
             <Text style={[styles.brandSubtitle, { color: colors.textMuted }]}>
-              Retirement Wealth Preservation & Monte Carlo Model
+              Multi-Market Retirement Wealth Preservation & Monte Carlo Model
             </Text>
           </View>
         </View>
@@ -156,7 +162,7 @@ export default function SimulationDashboard() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.contentConstrained}>
-          {/* Hero Banner / Strategy Quick Summary */}
+          {/* Hero Banner / Strategy Summary */}
           <View
             style={[
               styles.heroBanner,
@@ -167,16 +173,23 @@ export default function SimulationDashboard() {
             ]}
           >
             <View style={{ flex: 1 }}>
-              <Text style={[styles.heroHeading, { color: colors.textPrimary }]}>
-                Eliminate Sequence-of-Returns Risk
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={styles.countryFlagBadge}>{countryMeta.flag}</Text>
+                <Text style={[styles.heroHeading, { color: colors.textPrimary }]}>
+                  {countryMeta.name} Market Mode ({countryMeta.currencyCode})
+                </Text>
+              </View>
               <Text style={[styles.heroDescription, { color: colors.textSecondary }]}>
-                Bucket 1 secures your cash flow for 3 years so you never panic-sell equities during a market crash. Bucket 2 cushions 7 years of stability while Bucket 3 compounds your wealth long term.
+                Bucket 1 secures living expenses for {inputs.bucket1Years} years without liquidation risks. Bucket 2 absorbs equity volatility, and Bucket 3 compounds wealth across a {inputs.simulationHorizon}-year horizon
+                {inputs.foreignAllocationPercent > 0
+                  ? ` with ${inputs.foreignAllocationPercent}% foreign diversification in ${inputs.foreignCountry}`
+                  : ''}
+                .
               </Text>
             </View>
             <View style={styles.quickStatBox}>
               <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>
-                30-Yr Survival
+                {inputs.simulationHorizon}-Yr Survival
               </Text>
               <Text
                 style={[
@@ -189,7 +202,7 @@ export default function SimulationDashboard() {
             </View>
           </View>
 
-          {/* 1. Input Section */}
+          {/* 1. Input Section with Country Selector, Horizons & Foreign Allocation */}
           <InputSection
             inputs={inputs}
             onChangeInputs={setInputs}
@@ -202,19 +215,30 @@ export default function SimulationDashboard() {
             split={split}
             b1Years={inputs.bucket1Years}
             b2Years={inputs.bucket2Years}
+            baseCountry={inputs.baseCountry}
             onSelectBucket={(bNum) => setSelectedBucketModal(bNum)}
           />
 
-          {/* 3. 30-Year Trajectory Chart (Stacked Area & Monte Carlo Cone) */}
-          <ProjectionChart results={simResults} mcSummary={mcSummary} />
+          {/* 3. Trajectory Chart (Scales to Display Horizon) */}
+          <ProjectionChart
+            results={simResults}
+            mcSummary={mcSummary}
+            displayHorizon={inputs.displayHorizon || 30}
+            baseCountry={inputs.baseCountry}
+          />
 
           {/* 4. Actuarial Insights & Depletion Warning Panel */}
-          <InsightsPanel insights={insights} mcSummary={mcSummary} />
+          <InsightsPanel
+            insights={insights}
+            mcSummary={mcSummary}
+            baseCountry={inputs.baseCountry}
+            simulationHorizon={inputs.simulationHorizon || 30}
+          />
 
           {/* Footer Notes */}
           <View style={styles.footerNote}>
             <Text style={[styles.footerText, { color: colors.textMuted }]}>
-              3-Bucket Retirement Strategy Simulation • Built with React Native & Expo • Supports Offline Mode & Statistical Volatility Modelling.
+              3-Bucket Strategy Simulation • Universal Cross-Border Engine (US, India, UK, Eurozone) • Offline Storage & Actuarial Monte Carlo Modelling.
             </Text>
           </View>
         </View>
@@ -231,6 +255,7 @@ export default function SimulationDashboard() {
       {/* Instrument Recommendations Modal */}
       <InstrumentModal
         bucketNum={selectedBucketModal}
+        baseCountry={inputs.baseCountry}
         onClose={() => setSelectedBucketModal(null)}
       />
     </SafeAreaView>
@@ -327,10 +352,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 16,
   },
+  countryFlagBadge: {
+    fontSize: 18,
+    marginRight: 6,
+  },
   heroHeading: {
     fontSize: 15,
     fontWeight: '700',
-    marginBottom: 4,
   },
   heroDescription: {
     fontSize: 12,

@@ -8,7 +8,6 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import Svg, {
-  Rect,
   Path,
   Circle,
   Line,
@@ -21,27 +20,41 @@ import Svg, {
 import { useTheme } from '../../theme/ThemeContext';
 import { PALETTE } from '../../theme/colors';
 import { MonteCarloSummary, YearSimulationResult } from '../../engine/types';
-import { BarChart3, LineChart, Layers } from 'lucide-react-native';
+import { LineChart, Layers, ShieldCheck, ArrowRightLeft } from 'lucide-react-native';
+import { SupportedCountry, formatCurrency, formatShortAxis } from '../../utils/currency';
 
 interface ProjectionChartProps {
   results: YearSimulationResult[];
   mcSummary: MonteCarloSummary;
+  displayHorizon: number;
+  baseCountry: SupportedCountry;
 }
 
 export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   results,
   mcSummary,
+  displayHorizon = 30,
+  baseCountry = 'IN',
 }) => {
-  const { colors, theme } = useTheme();
+  const { colors } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
 
   const [activeTab, setActiveTab] = useState<'stacked' | 'montecarlo'>('stacked');
-  const [selectedYearIndex, setSelectedYearIndex] = useState<number>(14); // Year 15 default
+  const [selectedYearIndex, setSelectedYearIndex] = useState<number>(
+    Math.min(displayHorizon - 1, 9)
+  );
+
+  // Slice results according to user's customized Display Horizon
+  const effectiveHorizon = Math.min(results.length, Math.max(5, displayHorizon));
+  const displayedResults = results.slice(0, effectiveHorizon);
+  const displayedMedian = mcSummary.medianTrajectory.slice(0, effectiveHorizon);
+  const displayedP10 = mcSummary.p10Trajectory.slice(0, effectiveHorizon);
+  const displayedP90 = mcSummary.p90Trajectory.slice(0, effectiveHorizon);
 
   // Responsive chart width
   const containerWidth = Math.min(windowWidth - 36, 850);
   const chartHeight = 260;
-  const paddingLeft = 46;
+  const paddingLeft = 52;
   const paddingRight = 16;
   const paddingTop = 20;
   const paddingBottom = 32;
@@ -49,16 +62,8 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const innerWidth = containerWidth - paddingLeft - paddingRight;
   const innerHeight = chartHeight - paddingTop - paddingBottom;
 
-  // Max corpus across 30 years for scaling
-  const maxStackTotal = Math.max(
-    ...results.map((r) => r.totalCorpus),
-    1
-  );
-  const maxMCTotal = Math.max(
-    ...mcSummary.p90Trajectory,
-    ...mcSummary.medianTrajectory,
-    1
-  );
+  const maxStackTotal = Math.max(...displayedResults.map((r) => r.totalCorpus), 1);
+  const maxMCTotal = Math.max(...displayedP90, ...displayedMedian, 1);
   const maxVal = activeTab === 'stacked' ? maxStackTotal * 1.15 : maxMCTotal * 1.15;
 
   const scaleY = (val: number) => {
@@ -67,31 +72,20 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   };
 
   const scaleX = (index: number) => {
-    return paddingLeft + (index / 29) * innerWidth;
-  };
-
-  const formatShort = (val: number) => {
-    if (val >= 10000000) return `₹${(val / 10000000).toFixed(1)}Cr`;
-    if (val >= 100000) return `₹${(val / 100000).toFixed(0)}L`;
-    return `₹${Math.round(val / 1000)}k`;
+    const divisor = Math.max(1, effectiveHorizon - 1);
+    return paddingLeft + (index / divisor) * innerWidth;
   };
 
   // Stacked Area Paths
   const buildStackedAreaPaths = () => {
-    if (results.length === 0) return { b1Path: '', b2Path: '', b3Path: '' };
+    if (displayedResults.length === 0) return { b1Path: '', b2Path: '', b3Path: '' };
 
-    // Point calculations
-    // Base = 0
-    // L1 = B1
-    // L2 = B1 + B2
-    // L3 = B1 + B2 + B3
     const bottomY = scaleY(0);
-
     let b1Line = '';
     let b2Line = '';
     let b3Line = '';
 
-    results.forEach((r, idx) => {
+    displayedResults.forEach((r, idx) => {
       const x = scaleX(idx);
       const yB1 = scaleY(r.bucket1);
       const yB2 = scaleY(r.bucket1 + r.bucket2);
@@ -108,8 +102,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
       }
     });
 
-    // Close paths
-    const lastX = scaleX(29);
+    const lastX = scaleX(effectiveHorizon - 1);
     const firstX = scaleX(0);
 
     const b1Path = `${b1Line} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
@@ -119,17 +112,17 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
     return { b1Path, b2Path, b3Path };
   };
 
-  // Monte Carlo Paths (P10, P50, P90)
+  // Monte Carlo Paths
   const buildMCPaths = () => {
     let p90Line = '';
     let p50Line = '';
     let p10Line = '';
 
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < effectiveHorizon; i++) {
       const x = scaleX(i);
-      const yP90 = scaleY(mcSummary.p90Trajectory[i] || 0);
-      const yP50 = scaleY(mcSummary.medianTrajectory[i] || 0);
-      const yP10 = scaleY(mcSummary.p10Trajectory[i] || 0);
+      const yP90 = scaleY(displayedP90[i] || 0);
+      const yP50 = scaleY(displayedMedian[i] || 0);
+      const yP10 = scaleY(displayedP10[i] || 0);
 
       if (i === 0) {
         p90Line += `M ${x} ${yP90}`;
@@ -142,11 +135,10 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
       }
     }
 
-    // Band path between P90 and P10
     let bandPath = p90Line;
-    for (let i = 29; i >= 0; i--) {
+    for (let i = effectiveHorizon - 1; i >= 0; i--) {
       const x = scaleX(i);
-      const yP10 = scaleY(mcSummary.p10Trajectory[i] || 0);
+      const yP10 = scaleY(displayedP10[i] || 0);
       bandPath += ` L ${x} ${yP10}`;
     }
     bandPath += ' Z';
@@ -157,7 +149,18 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const { b1Path, b2Path, b3Path } = buildStackedAreaPaths();
   const { p90Line, p50Line, p10Line, bandPath } = buildMCPaths();
 
-  const selectedData = results[selectedYearIndex] || results[0];
+  const selectedData = displayedResults[selectedYearIndex] || displayedResults[0];
+
+  // Dynamic X-axis tick generator based on display horizon
+  const generateXTicks = () => {
+    const step = effectiveHorizon <= 15 ? 2 : effectiveHorizon <= 25 ? 5 : 5;
+    const ticks: number[] = [1];
+    for (let y = step; y < effectiveHorizon; y += step) {
+      if (y !== 1 && y !== effectiveHorizon) ticks.push(y);
+    }
+    ticks.push(effectiveHorizon);
+    return ticks;
+  };
 
   return (
     <View
@@ -170,26 +173,22 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
         },
       ]}
     >
-      {/* Header and Mode Toggle */}
       <View style={styles.chartHeader}>
         <View>
           <Text style={[styles.title, { color: colors.textPrimary }]}>
-            30-Year Portfolio Trajectory
+            Portfolio Trajectory ({effectiveHorizon} Years)
           </Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             {activeTab === 'stacked'
-              ? 'Multi-Bucket Waterfall Breakdown'
-              : 'Monte Carlo Stochastic Confidence Cone'}
+              ? 'Multi-Bucket Waterfall Breakdown & Rebalancing'
+              : 'Monte Carlo Stochastic Risk Cone (P10 - P50 - P90)'}
           </Text>
         </View>
 
         <View style={[styles.tabToggle, { backgroundColor: colors.surfaceElevated }]}>
           <TouchableOpacity
             onPress={() => setActiveTab('stacked')}
-            style={[
-              styles.tabBtn,
-              activeTab === 'stacked' && { backgroundColor: colors.accent },
-            ]}
+            style={[styles.tabBtn, activeTab === 'stacked' && { backgroundColor: colors.accent }]}
           >
             <Layers
               size={14}
@@ -208,10 +207,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
 
           <TouchableOpacity
             onPress={() => setActiveTab('montecarlo')}
-            style={[
-              styles.tabBtn,
-              activeTab === 'montecarlo' && { backgroundColor: colors.accent },
-            ]}
+            style={[styles.tabBtn, activeTab === 'montecarlo' && { backgroundColor: colors.accent }]}
           >
             <LineChart
               size={14}
@@ -230,7 +226,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
         </View>
       </View>
 
-      {/* SVG Chart Canvas */}
+      {/* SVG Canvas */}
       <View style={styles.svgWrapper}>
         <Svg width={containerWidth} height={chartHeight}>
           <Defs>
@@ -252,7 +248,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             </LinearGradient>
           </Defs>
 
-          {/* Grid lines */}
+          {/* Horizontal Grid */}
           {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => {
             const y = paddingTop + innerHeight * (1 - pct);
             const gridVal = maxVal * pct;
@@ -275,14 +271,14 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
                   textAnchor="end"
                   fontFamily="System"
                 >
-                  {formatShort(gridVal)}
+                  {formatShortAxis(gridVal, baseCountry)}
                 </SvgText>
               </G>
             );
           })}
 
-          {/* X Axis Ticks */}
-          {[1, 5, 10, 15, 20, 25, 30].map((yr) => {
+          {/* Dynamic X Axis Ticks */}
+          {generateXTicks().map((yr) => {
             const x = scaleX(yr - 1);
             return (
               <G key={`x-${yr}`}>
@@ -308,22 +304,17 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             );
           })}
 
-          {/* Stacked Chart Layer */}
+          {/* Layer 1: Stacked Waterfall Area */}
           {activeTab === 'stacked' ? (
             <G>
-              {/* Bucket 3 (Bottom-most in visual stack, covers B1+B2+B3) */}
               <Path d={b3Path} fill="url(#b3Grad)" />
-              {/* Bucket 2 (Covers B1+B2) */}
               <Path d={b2Path} fill="url(#b2Grad)" />
-              {/* Bucket 1 (Covers B1 only) */}
               <Path d={b1Path} fill="url(#b1Grad)" />
             </G>
           ) : (
-            /* Monte Carlo Risk Cone Layer */
+            /* Layer 2: Monte Carlo Risk Cone */
             <G>
-              {/* Confidence Band (10th to 90th percentile) */}
               <Path d={bandPath} fill="url(#mcConeGrad)" />
-              {/* 90th Percentile (Bull) */}
               <Path
                 d={p90Line}
                 fill="none"
@@ -331,9 +322,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
                 strokeWidth="2"
                 strokeDasharray="4 2"
               />
-              {/* 50th Percentile (Median) */}
               <Path d={p50Line} fill="none" stroke="#38BDF8" strokeWidth="2.5" />
-              {/* 10th Percentile (Bear) */}
               <Path
                 d={p10Line}
                 fill="none"
@@ -344,7 +333,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             </G>
           )}
 
-          {/* Vertical cursor indicator */}
+          {/* Vertical cursor */}
           <Line
             x1={scaleX(selectedYearIndex)}
             y1={paddingTop}
@@ -366,13 +355,13 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
         </Svg>
       </View>
 
-      {/* Year Selector Slider / Chips */}
+      {/* Year Selector Chips */}
       <View style={styles.yearScrollContainer}>
         <Text style={[styles.inspectPrompt, { color: colors.textMuted }]}>
-          Tap year to inspect details:
+          Inspect Year Details (Up to {effectiveHorizon} Years):
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.yearScroll}>
-          {results.map((r, idx) => {
+          {displayedResults.map((r, idx) => {
             const isSelected = idx === selectedYearIndex;
             return (
               <TouchableOpacity
@@ -400,14 +389,14 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
         </ScrollView>
       </View>
 
-      {/* Selected Year Detail Inspector Card */}
+      {/* Year Inspector Card */}
       <View style={[styles.inspectorCard, { backgroundColor: colors.surfaceElevated }]}>
         <View style={styles.inspectorHeader}>
           <Text style={[styles.inspectorYearTitle, { color: colors.textPrimary }]}>
             Year {selectedData.year} ({selectedData.calendarYear})
           </Text>
           <Text style={[styles.inspectorTotalVal, { color: colors.accent }]}>
-            Total: {formatShort(selectedData.totalCorpus)}
+            Total: {formatCurrency(selectedData.totalCorpus, baseCountry)}
           </Text>
         </View>
 
@@ -416,7 +405,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             <View style={[styles.metricDot, { backgroundColor: PALETTE.bucket1.base }]} />
             <Text style={[styles.metricLabel, { color: colors.textMuted }]}>B1 (Cash):</Text>
             <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
-              {formatShort(selectedData.bucket1)}
+              {formatCurrency(selectedData.bucket1, baseCountry)}
             </Text>
           </View>
 
@@ -424,7 +413,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             <View style={[styles.metricDot, { backgroundColor: PALETTE.bucket2.base }]} />
             <Text style={[styles.metricLabel, { color: colors.textMuted }]}>B2 (Stable):</Text>
             <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
-              {formatShort(selectedData.bucket2)}
+              {formatCurrency(selectedData.bucket2, baseCountry)}
             </Text>
           </View>
 
@@ -432,7 +421,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             <View style={[styles.metricDot, { backgroundColor: PALETTE.bucket3.base }]} />
             <Text style={[styles.metricLabel, { color: colors.textMuted }]}>B3 (Growth):</Text>
             <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
-              {formatShort(selectedData.bucket3)}
+              {formatCurrency(selectedData.bucket3, baseCountry)}
             </Text>
           </View>
 
@@ -440,22 +429,50 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             <View style={[styles.metricDot, { backgroundColor: '#F43F5E' }]} />
             <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Withdrawal:</Text>
             <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
-              {formatShort(selectedData.withdrawalAmount)}
+              {formatCurrency(selectedData.withdrawalAmount, baseCountry)}
             </Text>
           </View>
         </View>
 
-        {selectedData.bucket1RefilledFromB2 > 0 || selectedData.bucket2RefilledFromB3 > 0 ? (
-          <View style={styles.refillAlert}>
-            <Text style={[styles.refillAlertText, { color: colors.accent }]}>
-              Waterfall refill triggered:{' '}
-              {selectedData.bucket1RefilledFromB2 > 0
-                ? `B2→B1 (${formatShort(selectedData.bucket1RefilledFromB2)}) `
-                : ''}
-              {selectedData.bucket2RefilledFromB3 > 0
-                ? `B3→B2 (${formatShort(selectedData.bucket2RefilledFromB3)})`
-                : ''}
-            </Text>
+        {/* Detailed Waterfall Rebalance & Defense Notifications */}
+        {selectedData.bucket1RefilledFromB2 > 0 ||
+        selectedData.bucket2RefilledFromB3 > 0 ||
+        selectedData.bearMarketDefenseActive ? (
+          <View style={styles.waterfallAudit}>
+            {selectedData.bucket1RefilledFromB2 > 0 ? (
+              <View style={styles.auditRow}>
+                <ArrowRightLeft size={13} color={PALETTE.bucket1.base} style={{ marginRight: 6 }} />
+                <Text style={[styles.auditText, { color: colors.textSecondary }]}>
+                  Waterfall Refill: Transferred{' '}
+                  <Text style={{ fontWeight: '700', color: colors.textPrimary }}>
+                    {formatCurrency(selectedData.bucket1RefilledFromB2, baseCountry)}
+                  </Text>{' '}
+                  from Bucket 2 to replenish Bucket 1 cash floor.
+                </Text>
+              </View>
+            ) : null}
+
+            {selectedData.bucket2RefilledFromB3 > 0 ? (
+              <View style={styles.auditRow}>
+                <ArrowRightLeft size={13} color={PALETTE.bucket3.base} style={{ marginRight: 6 }} />
+                <Text style={[styles.auditText, { color: colors.textSecondary }]}>
+                  Equity Harvesting: Harvested{' '}
+                  <Text style={{ fontWeight: '700', color: colors.textPrimary }}>
+                    {formatCurrency(selectedData.bucket2RefilledFromB3, baseCountry)}
+                  </Text>{' '}
+                  from Bucket 3 growth to reinforce Bucket 2 reserves.
+                </Text>
+              </View>
+            ) : null}
+
+            {selectedData.bearMarketDefenseActive ? (
+              <View style={styles.auditRow}>
+                <ShieldCheck size={14} color="#10B981" style={{ marginRight: 6 }} />
+                <Text style={[styles.auditText, { color: '#10B981', fontWeight: '600' }]}>
+                  Bear Market Defense Active: Equities in Bucket 3 were shielded from panic liquidation during drawdown.
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -535,7 +552,7 @@ const styles = StyleSheet.create({
   },
   inspectorCard: {
     borderRadius: 14,
-    padding: 12,
+    padding: 14,
     marginTop: 12,
   },
   inspectorHeader: {
@@ -576,14 +593,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  refillAlert: {
-    marginTop: 8,
-    paddingTop: 6,
+  waterfallAudit: {
+    marginTop: 10,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 6,
   },
-  refillAlertText: {
+  auditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  auditText: {
     fontSize: 11,
-    fontWeight: '600',
+    lineHeight: 16,
+    flex: 1,
   },
 });

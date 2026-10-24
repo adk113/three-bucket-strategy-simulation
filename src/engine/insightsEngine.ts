@@ -1,3 +1,4 @@
+import { formatCurrency } from '../utils/currency';
 import { MonteCarloSummary, SimulationInputs, StrategyInsight, YearSimulationResult } from './types';
 
 export function generateStrategyInsights(
@@ -6,91 +7,85 @@ export function generateStrategyInsights(
   mcSummary: MonteCarloSummary
 ): StrategyInsight[] {
   const insights: StrategyInsight[] = [];
+  const country = inputs.baseCountry || 'IN';
+  const horizon = inputs.simulationHorizon || 30;
+
   const annualWithdrawal = inputs.monthlyWithdrawal * 12;
   const withdrawalRate = (annualWithdrawal / inputs.initialCorpus) * 100;
-  const initialCashBufferYears = inputs.bucket1Years;
-  const initialStabilityYears = inputs.bucket2Years;
-  const combinedBufferYears = initialCashBufferYears + initialStabilityYears;
+  const combinedBufferYears = inputs.bucket1Years + inputs.bucket2Years;
 
-  // 1. Success Rate Insight
-  if (mcSummary.successRate >= 92) {
+  // Total friction incurred over simulation
+  const totalFrictionIncurred = simResults.reduce((acc, cur) => acc + cur.rebalanceFrictionCost, 0);
+
+  // 1. Success Rate & Longevity Insight
+  if (mcSummary.successRate >= 90) {
     insights.push({
       type: 'success',
-      title: 'High Longevity Confidence (92%+)',
-      message: `Your strategy achieves a robust ${mcSummary.successRate}% probability of surviving 30 years across 500 market cycle simulations without depleting.`,
+      title: `High Longevity Confidence (${mcSummary.successRate}%)`,
+      message: `Your ${inputs.baseCountry} retirement portfolio has an actuarial ${mcSummary.successRate}% probability of outliving your ${horizon}-year horizon across 500 stochastic market cycles.`,
       recommendation:
-        mcSummary.percentile10BalanceYear30 > 0
-          ? `Even in the worst 10% market scenarios, your terminal corpus remains positive (~${formatCurrency(
-              mcSummary.percentile10BalanceYear30
+        mcSummary.percentile10BalanceTerminal > 0
+          ? `Even in the worst 10% market scenarios, your terminal corpus remains intact (${formatCurrency(
+              mcSummary.percentile10BalanceTerminal,
+              country
             )}).`
           : undefined,
     });
   } else if (mcSummary.successRate >= 75) {
     insights.push({
       type: 'warning',
-      title: 'Moderate Sequence-of-Returns Risk',
-      message: `The simulation shows a ${mcSummary.successRate}% survival probability. In prolonged bear markets, the portfolio faces a ${(
+      title: `Moderate Sequence-of-Returns Risk (${mcSummary.successRate}%)`,
+      message: `The simulation shows a ${mcSummary.successRate}% survival probability over ${horizon} years. In severe bear markets, there is a ${(
         100 - mcSummary.successRate
-      ).toFixed(1)}% chance of depletion.`,
-      recommendation:
-        mcSummary.earliestDepletionYear
-          ? `Earliest simulated depletion occurred around Year ${mcSummary.earliestDepletionYear}. Consider reducing monthly withdrawal by 5-10% to secure a 95%+ success rate.`
-          : 'Consider boosting Bucket 2 stability reserves.',
+      ).toFixed(1)}% risk of capital exhaustion.`,
+      recommendation: mcSummary.earliestDepletionYear
+        ? `Earliest simulated depletion observed at Year ${mcSummary.earliestDepletionYear}. Reducing monthly withdrawal by 5-8% elevates your survival odds to >95%.`
+        : 'Consider boosting your Bucket 2 stability buffer.',
     });
   } else {
     insights.push({
       type: 'danger',
-      title: 'Elevated Depletion Hazard',
-      message: `Your current withdrawal pace has a critical failure rate of ${(
+      title: `Critical Depletion Risk (${(100 - mcSummary.successRate).toFixed(1)}% Failure)`,
+      message: `At your current withdrawal pace, the portfolio fails within the ${horizon}-year horizon in ${(
         100 - mcSummary.successRate
-      ).toFixed(1)}%. The portfolio is likely to run dry within 30 years under realistic inflation.`,
-      recommendation: `Action Required: Tap the "Suggest Safe Withdrawal" button to calculate a sustainable monthly amount.`,
+      ).toFixed(1)}% of economic simulations.`,
+      recommendation: `Action: Tap "Suggest Safe" to compute the sustainable monthly withdrawal for ${inputs.baseCountry}.`,
     });
   }
 
-  // 2. Withdrawal Rate Diagnostic
-  if (withdrawalRate > 5.5) {
+  // 2. Cross-Border Diversification Advantage
+  if (inputs.foreignAllocationPercent > 0 && inputs.baseCountry !== inputs.foreignCountry) {
+    insights.push({
+      type: 'info',
+      title: `Cross-Border Diversification Active (${inputs.foreignAllocationPercent}% ${inputs.foreignCountry})`,
+      message: `Allocating ${inputs.foreignAllocationPercent}% of Bucket 3 to ${inputs.foreignCountry} assets reduced equity volatility drag by ~${mcSummary.diversificationBenefitVolReduction}% and provides geographic currency protection.`,
+    });
+  }
+
+  // 3. Withdrawal Rate Diagnostic
+  const maxSafeThreshold = country === 'US' || country === 'EU' ? 4.2 : 4.8;
+  if (withdrawalRate > maxSafeThreshold) {
     insights.push({
       type: 'danger',
       title: `High Initial Withdrawal Rate (${withdrawalRate.toFixed(2)}%)`,
       message: `An initial withdrawal rate of ${withdrawalRate.toFixed(
         2
-      )}% is significantly above the historical safe threshold (3.5% - 4.5%) when indexed to ${inputs.inflationRate}% annual inflation.`,
-      recommendation: `Recommended initial withdrawal should not exceed 4.0% - 4.5% of total corpus for long retirement horizons.`,
-    });
-  } else if (withdrawalRate <= 3.8) {
-    insights.push({
-      type: 'info',
-      title: `Conservative Withdrawal Rate (${withdrawalRate.toFixed(2)}%)`,
-      message: `Your withdrawal rate is well within safe capital preservation guidelines. You have strong leeway to absorb healthcare spikes or leave an inheritance.`,
+      )}% exceeds the ${country} sustainable guideline (${maxSafeThreshold}%) under ${inputs.inflationRate}% annual inflation.`,
+      recommendation: `Target an initial withdrawal under ${maxSafeThreshold}% to avoid irreversible sequence drag.`,
     });
   }
 
-  // 3. Buffer Runway & Bear Market Protection
-  if (combinedBufferYears >= 8) {
+  // 4. Rebalancing Waterfall & Friction Analytics
+  if (totalFrictionIncurred > 0) {
     insights.push({
-      type: 'success',
-      title: `${combinedBufferYears}-Year Shock Absorber Active`,
-      message: `With ${initialCashBufferYears} years in Bucket 1 and ${initialStabilityYears} years in Bucket 2, you can weather any modern equity bear market without panic selling equities at the bottom.`,
-    });
-  } else {
-    insights.push({
-      type: 'warning',
-      title: 'Short Cash/Bond Buffer (< 8 Years)',
-      message: `Your combined Bucket 1 & 2 runway is only ${combinedBufferYears} years. Prolonged market downturns may force you to sell equities in Bucket 3 during a recession.`,
-      recommendation: `Increase Bucket 2 allocation to provide at least 7-8 years of cumulative living expense coverage.`,
+      type: 'info',
+      title: `Rebalancing Friction & Net Capital Preservation`,
+      message: `Over the simulation horizon, bucket-to-bucket rebalancing incurred ${formatCurrency(
+        totalFrictionIncurred,
+        country
+      )} in estimated rebalancing slippage/friction (${inputs.rebalancingFrictionRate || 0.15}% rate), but protected ${combinedBufferYears} full years of uninterrupted cash flow without forced fire-sales.`,
     });
   }
 
   return insights;
-}
-
-function formatCurrency(amount: number): string {
-  if (amount >= 10000000) {
-    return `₹${(amount / 10000000).toFixed(2)} Cr`;
-  }
-  if (amount >= 100000) {
-    return `₹${(amount / 100000).toFixed(2)} L`;
-  }
-  return `₹${amount.toLocaleString()}`;
 }

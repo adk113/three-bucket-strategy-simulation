@@ -1,8 +1,7 @@
-import { HISTORICAL_BENCHMARKS } from './historicalData';
+import { COUNTRY_PROFILES, calculateBlendedBucket3 } from './historicalData';
 import { runDeterministicSimulation } from './simulationEngine';
 import { MonteCarloSummary, SimulationInputs } from './types';
 
-// Standard normal generator (Box-Muller)
 function randomNormal(mean = 0, stdDev = 1): number {
   let u = 0;
   let v = 0;
@@ -16,39 +15,50 @@ export function runMonteCarloSimulation(
   inputs: SimulationInputs,
   runs = 500
 ): MonteCarloSummary {
+  const countryProfile = COUNTRY_PROFILES[inputs.baseCountry || 'IN'] || COUNTRY_PROFILES.IN;
+  const blendedB3 = calculateBlendedBucket3(
+    inputs.baseCountry || 'IN',
+    inputs.foreignCountry || 'US',
+    inputs.foreignAllocationPercent || 0
+  );
+
+  const horizon = Math.max(10, Math.min(60, inputs.simulationHorizon || 30));
+
   const mu1 =
     inputs.mode === 'manual'
       ? inputs.manualReturns.bucket1 / 100
-      : HISTORICAL_BENCHMARKS.bucket1.nominalReturnMean / 100;
-  const sigma1 = HISTORICAL_BENCHMARKS.bucket1.stdDev / 100;
+      : countryProfile.bucket1.nominalReturnMean / 100;
+  const sigma1 = countryProfile.bucket1.stdDev / 100;
 
   const mu2 =
     inputs.mode === 'manual'
       ? inputs.manualReturns.bucket2 / 100
-      : HISTORICAL_BENCHMARKS.bucket2.nominalReturnMean / 100;
-  const sigma2 = HISTORICAL_BENCHMARKS.bucket2.stdDev / 100;
+      : countryProfile.bucket2.nominalReturnMean / 100;
+  const sigma2 = countryProfile.bucket2.stdDev / 100;
 
   const mu3 =
     inputs.mode === 'manual'
       ? inputs.manualReturns.bucket3 / 100
-      : HISTORICAL_BENCHMARKS.bucket3.nominalReturnMean / 100;
-  const sigma3 = HISTORICAL_BENCHMARKS.bucket3.stdDev / 100;
+      : blendedB3.blendedReturn / 100;
+  const sigma3 = blendedB3.blendedStdDev / 100;
 
-  const yearBalances: number[][] = Array.from({ length: 30 }, () => []);
+  // Volatility reduction from foreign diversification
+  const domesticB3StdDev = countryProfile.bucket3.stdDev;
+  const volReduction = Number((domesticB3StdDev - blendedB3.blendedStdDev).toFixed(2));
+
+  const yearBalances: number[][] = Array.from({ length: horizon }, () => []);
   let survivingCount = 0;
   const depletionYears: number[] = [];
 
   for (let r = 0; r < runs; r++) {
-    // Generate 30 years of correlated stochastic returns
     const yearlyReturns: { b1: number; b2: number; b3: number }[] = [];
 
-    for (let yr = 0; yr < 30; yr++) {
-      // Independent normal shocks
+    for (let yr = 0; yr < horizon; yr++) {
       const z1 = randomNormal(0, 1);
       const z2 = randomNormal(0, 1);
       const z3 = randomNormal(0, 1);
 
-      // Mild correlation between Bucket 2 and Bucket 3 (~0.2)
+      // Mild correlation between debt and equity (~0.2)
       const corrZ2 = 0.2 * z3 + Math.sqrt(1 - 0.2 * 0.2) * z2;
 
       const r1 = Math.max(-0.01, mu1 + sigma1 * z1);
@@ -61,8 +71,8 @@ export function runMonteCarloSimulation(
     const simPath = runDeterministicSimulation(inputs, yearlyReturns);
 
     let depletedAt: number | null = null;
-    for (let yr = 0; yr < 30; yr++) {
-      const bal = simPath[yr].totalCorpus;
+    for (let yr = 0; yr < horizon; yr++) {
+      const bal = simPath[yr]?.totalCorpus || 0;
       yearBalances[yr].push(bal);
 
       if (bal <= 0 && depletedAt === null) {
@@ -77,12 +87,11 @@ export function runMonteCarloSimulation(
     }
   }
 
-  // Calculate percentiles for each year
   const medianTrajectory: number[] = [];
   const p10Trajectory: number[] = [];
   const p90Trajectory: number[] = [];
 
-  for (let yr = 0; yr < 30; yr++) {
+  for (let yr = 0; yr < horizon; yr++) {
     const sorted = [...yearBalances[yr]].sort((a, b) => a - b);
     const p10Index = Math.floor(runs * 0.1);
     const p50Index = Math.floor(runs * 0.5);
@@ -108,9 +117,9 @@ export function runMonteCarloSimulation(
 
   return {
     successRate,
-    medianBalanceYear30: medianTrajectory[29] || 0,
-    percentile10BalanceYear30: p10Trajectory[29] || 0,
-    percentile90BalanceYear30: p90Trajectory[29] || 0,
+    medianBalanceTerminal: medianTrajectory[horizon - 1] || 0,
+    percentile10BalanceTerminal: p10Trajectory[horizon - 1] || 0,
+    percentile90BalanceTerminal: p90Trajectory[horizon - 1] || 0,
     medianTrajectory,
     p10Trajectory,
     p90Trajectory,
@@ -118,5 +127,6 @@ export function runMonteCarloSimulation(
     averageDepletionYear,
     depletionCount: runs - survivingCount,
     totalRuns: runs,
+    diversificationBenefitVolReduction: Math.max(0, volReduction),
   };
 }

@@ -1,51 +1,69 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SavedStrategy, SimulationInputs } from '../engine/types';
 
-const STORAGE_KEY = '@three_bucket_saved_strategies_v1';
+const STORAGE_KEY = '@three_bucket_saved_strategies_v2';
 
 export const DEFAULT_PRESETS: SavedStrategy[] = [
   {
     id: 'preset_balanced_classic',
-    name: 'Classic Balanced (₹2 Cr Corpus)',
+    name: 'Classic Balanced (India ₹2 Cr)',
     createdAt: '2026-01-01T00:00:00.000Z',
     inputs: {
-      initialCorpus: 20000000, // 2 Cr
-      monthlyWithdrawal: 65000, // 65k / month
+      initialCorpus: 20000000,
+      monthlyWithdrawal: 65000,
       startDate: '01/01/2026',
       inflationRate: 6.0,
       bucket1Years: 3,
       bucket2Years: 7,
       mode: 'historical',
+      baseCountry: 'IN',
+      foreignCountry: 'US',
+      foreignAllocationPercent: 25,
+      simulationHorizon: 30,
+      displayHorizon: 30,
+      rebalancingFrictionRate: 0.15,
       manualReturns: { bucket1: 5.5, bucket2: 8.0, bucket3: 12.0 },
     },
   },
   {
-    id: 'preset_fire_early',
-    name: 'Aggressive Early FIRE (₹3.5 Cr)',
+    id: 'preset_fire_us',
+    name: 'US Early FIRE ($1.5M)',
     createdAt: '2026-01-01T00:00:00.000Z',
     inputs: {
-      initialCorpus: 35000000, // 3.5 Cr
-      monthlyWithdrawal: 100000, // 1 Lakh / month
+      initialCorpus: 1500000,
+      monthlyWithdrawal: 5500,
       startDate: '01/01/2026',
-      inflationRate: 6.5,
-      bucket1Years: 2,
+      inflationRate: 2.8,
+      bucket1Years: 3,
       bucket2Years: 6,
       mode: 'historical',
-      manualReturns: { bucket1: 6.0, bucket2: 8.5, bucket3: 13.0 },
+      baseCountry: 'US',
+      foreignCountry: 'IN',
+      foreignAllocationPercent: 15,
+      simulationHorizon: 40,
+      displayHorizon: 30,
+      rebalancingFrictionRate: 0.10,
+      manualReturns: { bucket1: 3.2, bucket2: 4.8, bucket3: 10.2 },
     },
   },
   {
     id: 'preset_conservative_retiree',
-    name: 'Conservative Capital Preservation (₹1.5 Cr)',
+    name: 'Conservative Capital Preservation (India ₹1.5 Cr)',
     createdAt: '2026-01-01T00:00:00.000Z',
     inputs: {
-      initialCorpus: 15000000, // 1.5 Cr
-      monthlyWithdrawal: 45000, // 45k / month
+      initialCorpus: 15000000,
+      monthlyWithdrawal: 45000,
       startDate: '01/01/2026',
       inflationRate: 5.5,
       bucket1Years: 4,
       bucket2Years: 8,
       mode: 'historical',
+      baseCountry: 'IN',
+      foreignCountry: 'US',
+      foreignAllocationPercent: 0,
+      simulationHorizon: 30,
+      displayHorizon: 20,
+      rebalancingFrictionRate: 0.15,
       manualReturns: { bucket1: 5.5, bucket2: 7.5, bucket3: 11.0 },
     },
   },
@@ -55,7 +73,6 @@ export async function getSavedStrategies(): Promise<SavedStrategy[]> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      // Initialize with default presets on first use
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRESETS));
       return DEFAULT_PRESETS;
     }

@@ -1,25 +1,29 @@
 import React from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
-import { X, CheckCircle, Shield, TrendingUp, Layers } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
-import { HISTORICAL_BENCHMARKS } from '../../engine/historicalData';
+import { COUNTRY_PROFILES } from '../../engine/historicalData';
 import { PALETTE } from '../../theme/colors';
+import { SupportedCountry } from '../../utils/currency';
 
 interface InstrumentModalProps {
   bucketNum: 1 | 2 | 3 | null;
+  baseCountry?: SupportedCountry;
   onClose: () => void;
 }
 
 export const InstrumentModal: React.FC<InstrumentModalProps> = ({
   bucketNum,
+  baseCountry = 'IN',
   onClose,
 }) => {
-  const { colors, theme } = useTheme();
+  const { colors } = useTheme();
 
   if (!bucketNum) return null;
 
+  const countryProfile = COUNTRY_PROFILES[baseCountry] || COUNTRY_PROFILES.IN;
   const configKey = bucketNum === 1 ? 'bucket1' : bucketNum === 2 ? 'bucket2' : 'bucket3';
-  const data = HISTORICAL_BENCHMARKS[configKey];
+  const data = countryProfile[configKey];
   const bucketColor =
     bucketNum === 1
       ? PALETTE.bucket1.base
@@ -42,7 +46,14 @@ export const InstrumentModal: React.FC<InstrumentModalProps> = ({
         >
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: bucketColor }]}>{data.name}</Text>
+              <Text style={[styles.title, { color: bucketColor }]}>
+                {bucketNum === 1
+                  ? 'Bucket 1: Cash Liquidity'
+                  : bucketNum === 2
+                  ? 'Bucket 2: Stability & Income'
+                  : 'Bucket 3: Long-Term Growth'}{' '}
+                ({countryProfile.name})
+              </Text>
               <Text style={[styles.subtitle, { color: colors.textMuted }]}>{data.role}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -52,7 +63,7 @@ export const InstrumentModal: React.FC<InstrumentModalProps> = ({
 
           <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
             <Text style={[styles.sectionHeading, { color: colors.textPrimary }]}>
-              Recommended Asset Vehicles & Allocation
+              Recommended Vehicles for {countryProfile.name}
             </Text>
 
             {data.instruments.map((item, idx) => (

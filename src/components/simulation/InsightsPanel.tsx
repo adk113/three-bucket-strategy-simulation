@@ -10,25 +10,22 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { MonteCarloSummary, StrategyInsight } from '../../engine/types';
-import { PALETTE } from '../../theme/colors';
+import { SupportedCountry, formatCurrency } from '../../utils/currency';
 
 interface InsightsPanelProps {
   insights: StrategyInsight[];
   mcSummary: MonteCarloSummary;
+  baseCountry: SupportedCountry;
+  simulationHorizon: number;
 }
 
 export const InsightsPanel: React.FC<InsightsPanelProps> = ({
   insights,
   mcSummary,
+  baseCountry = 'IN',
+  simulationHorizon = 30,
 }) => {
   const { colors, theme } = useTheme();
-
-  const formatCurrency = (val: number) => {
-    if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)} Cr`;
-    if (val >= 100000) return `₹${(val / 100000).toFixed(2)} Lakh`;
-    return `₹${val.toLocaleString()}`;
-  };
-
   const isDepletionRiskHigh = mcSummary.successRate < 85;
 
   return (
@@ -48,7 +45,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
             Statistical Insights & Risk Diagnostic
           </Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            Monte Carlo actuarial analysis across 500 randomized market cycles
+            Actuarial Monte Carlo analysis across 500 market cycles ({simulationHorizon}-year horizon)
           </Text>
         </View>
       </View>
@@ -67,16 +64,15 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
           <AlertTriangle size={22} color="#EF4444" style={{ marginRight: 10, marginTop: 2 }} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.depletionTitle, { color: '#EF4444' }]}>
-              Depletion Alert: High Probability of Capital Exhaustion
+              Depletion Alert: High Probability of Premature Exhaustion
             </Text>
             <Text style={[styles.depletionDesc, { color: theme === 'dark' ? '#FCA5A5' : '#991B1B' }]}>
-              The probabilistic model detects that your current withdrawal pace has a{' '}
-              {(100 - mcSummary.successRate).toFixed(1)}% chance of depleting the entire corpus
-              within 30 years
+              The probabilistic engine indicates a {(100 - mcSummary.successRate).toFixed(1)}% chance
+              that the corpus will deplete before Year {simulationHorizon}
               {mcSummary.earliestDepletionYear
                 ? ` (earliest simulated depletion around Year ${mcSummary.earliestDepletionYear})`
                 : ''}
-              . Tap "Suggest Safe Withdrawal" to restore longevity.
+              . Tap "Suggest Safe" to calibrate your monthly withdrawal.
             </Text>
           </View>
         </View>
@@ -88,39 +84,38 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
         <View
           style={[
             styles.statCard,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.borderSubtle,
-            },
+            { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
           ]}
         >
           <View style={styles.statIconRow}>
             <Percent size={14} color={mcSummary.successRate >= 90 ? '#10B981' : '#F59E0B'} />
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-              Success Rate
-            </Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Success Rate</Text>
           </View>
           <Text
             style={[
               styles.statValue,
-              { color: mcSummary.successRate >= 90 ? '#10B981' : mcSummary.successRate >= 75 ? '#F59E0B' : '#EF4444' },
+              {
+                color:
+                  mcSummary.successRate >= 90
+                    ? '#10B981'
+                    : mcSummary.successRate >= 75
+                    ? '#F59E0B'
+                    : '#EF4444',
+              },
             ]}
           >
             {mcSummary.successRate}%
           </Text>
           <Text style={[styles.statSub, { color: colors.textMuted }]}>
-            30-Year Survival
+            {simulationHorizon}-Year Longevity
           </Text>
         </View>
 
-        {/* Median Year 30 Balance */}
+        {/* Median Terminal Balance */}
         <View
           style={[
             styles.statCard,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.borderSubtle,
-            },
+            { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
           ]}
         >
           <View style={styles.statIconRow}>
@@ -130,10 +125,10 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
             </Text>
           </View>
           <Text style={[styles.statValue, { color: colors.textPrimary }]}>
-            {formatCurrency(mcSummary.medianBalanceYear30)}
+            {formatCurrency(mcSummary.medianBalanceTerminal, baseCountry)}
           </Text>
           <Text style={[styles.statSub, { color: colors.textMuted }]}>
-            Expected Year 30 Wealth
+            Expected Final Wealth
           </Text>
         </View>
 
@@ -141,14 +136,14 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
         <View
           style={[
             styles.statCard,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.borderSubtle,
-            },
+            { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
           ]}
         >
           <View style={styles.statIconRow}>
-            <ShieldAlert size={14} color={mcSummary.percentile10BalanceYear30 > 0 ? '#10B981' : '#EF4444'} />
+            <ShieldAlert
+              size={14}
+              color={mcSummary.percentile10BalanceTerminal > 0 ? '#10B981' : '#EF4444'}
+            />
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               Bear Case (P10)
             </Text>
@@ -156,10 +151,13 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
           <Text
             style={[
               styles.statValue,
-              { color: mcSummary.percentile10BalanceYear30 > 0 ? colors.textPrimary : '#EF4444' },
+              {
+                color:
+                  mcSummary.percentile10BalanceTerminal > 0 ? colors.textPrimary : '#EF4444',
+              },
             ]}
           >
-            {formatCurrency(mcSummary.percentile10BalanceYear30)}
+            {formatCurrency(mcSummary.percentile10BalanceTerminal, baseCountry)}
           </Text>
           <Text style={[styles.statSub, { color: colors.textMuted }]}>
             Severe Market Stress
@@ -189,10 +187,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
               key={idx}
               style={[
                 styles.insightItem,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor,
-                },
+                { backgroundColor: colors.surfaceElevated, borderColor },
               ]}
             >
               <View style={styles.insightIconBox}>{icon}</View>
