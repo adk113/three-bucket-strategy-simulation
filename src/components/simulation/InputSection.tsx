@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Switch,
   ScrollView,
+  Modal,
 } from 'react-native';
 import {
   Sparkles,
@@ -18,6 +19,8 @@ import {
   Plus,
   Trash2,
   Settings2,
+  X,
+  Check,
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { DatePickerInput } from '../common/DatePickerInput';
@@ -33,7 +36,18 @@ interface InputSectionProps {
   onOpenEducationModal: () => void;
 }
 
-const HORIZON_OPTIONS = [10, 15, 20, 25, 30, 40, 50, 60, 70, 80];
+const HORIZON_OPTIONS = [
+  { value: 10, label: '10 Years', desc: 'Short Horizon / Phase 1' },
+  { value: 15, label: '15 Years', desc: 'Mid Horizon' },
+  { value: 20, label: '20 Years', desc: 'Two Decades' },
+  { value: 25, label: '25 Years', desc: 'Quarter Century' },
+  { value: 30, label: '30 Years', desc: 'Standard Retirement' },
+  { value: 40, label: '40 Years', desc: 'Extended Longevity' },
+  { value: 50, label: '50 Years', desc: '🌟 Lifelong Multi-Decade' },
+  { value: 60, label: '60 Years', desc: '💎 Multi-Generational' },
+  { value: 70, label: '70 Years', desc: 'Dynasty Horizon' },
+  { value: 80, label: '80 Years', desc: '👑 Centenarian Longevity' },
+];
 
 export const InputSection: React.FC<InputSectionProps> = ({
   inputs,
@@ -45,7 +59,8 @@ export const InputSection: React.FC<InputSectionProps> = ({
   const country = inputs.baseCountry || 'IN';
   const meta = COUNTRY_METAS[country] || COUNTRY_METAS.IN;
 
-  const [horizonDropdownOpen, setHorizonDropdownOpen] = useState<'sim' | 'disp' | null>(null);
+  // Modal picker for horizons to completely eliminate z-index overlap bugs
+  const [horizonModalMode, setHorizonModalMode] = useState<'sim' | 'disp' | null>(null);
 
   const handleCorpusChange = (text: string) => {
     const clean = text.replace(/[^0-9]/g, '');
@@ -69,7 +84,6 @@ export const InputSection: React.FC<InputSectionProps> = ({
 
   const handleBaseCountryChange = (newCountry: SupportedCountry) => {
     const newMeta = COUNTRY_METAS[newCountry];
-    // Re-seed multi-country allocation with Base 60% and secondary 40%
     const defaultSec = newCountry === 'US' ? 'IN' : 'US';
     const newAllocs: CrossBorderEquityAllocation[] = [
       { country: newCountry, weight: 60, isManual: false },
@@ -291,7 +305,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
         </View>
       </View>
 
-      {/* 4. Ultra-Long Time Horizons (Dropdown up to 80 Years) */}
+      {/* 4. Ultra-Long Time Horizons (Modal Trigger Buttons — Zero Overlap) */}
       <View style={[styles.horizonSection, { borderTopColor: colors.borderSubtle }]}>
         <View style={styles.horizonHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -311,131 +325,45 @@ export const InputSection: React.FC<InputSectionProps> = ({
           </TouchableOpacity>
         </View>
 
-        <View style={styles.horizonDropdownRow}>
-          {/* Simulation Horizon Dropdown */}
+        <View style={styles.horizonButtonsRow}>
+          {/* Simulation Horizon Trigger */}
           <View style={{ flex: 1, marginRight: 8 }}>
             <Text style={[styles.fieldLabelSub, { color: colors.textSecondary }]}>
               Simulate Backend:
             </Text>
             <TouchableOpacity
-              onPress={() =>
-                setHorizonDropdownOpen(horizonDropdownOpen === 'sim' ? null : 'sim')
-              }
+              onPress={() => setHorizonModalMode('sim')}
               style={[
                 styles.dropdownTrigger,
                 { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
               ]}
+              activeOpacity={0.7}
             >
               <Text style={[styles.dropdownTriggerText, { color: colors.textPrimary }]}>
                 {inputs.simulationHorizon || 30} Years
               </Text>
-              <Text style={{ color: colors.accent, fontWeight: '700' }}>▾</Text>
+              <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>▾</Text>
             </TouchableOpacity>
-
-            {horizonDropdownOpen === 'sim' && (
-              <View
-                style={[
-                  styles.dropdownMenu,
-                  { backgroundColor: colors.surfaceCard, borderColor: colors.border },
-                ]}
-              >
-                <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={true}>
-                  {HORIZON_OPTIONS.map((yrs) => (
-                    <TouchableOpacity
-                      key={yrs}
-                      onPress={() => {
-                        onChangeInputs({
-                          ...inputs,
-                          simulationHorizon: yrs,
-                          displayHorizon: Math.min(inputs.displayHorizon || 30, yrs),
-                        });
-                        setHorizonDropdownOpen(null);
-                      }}
-                      style={[
-                        styles.dropdownItem,
-                        inputs.simulationHorizon === yrs && { backgroundColor: colors.accent + '20' },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.dropdownItemText,
-                          {
-                            color:
-                              inputs.simulationHorizon === yrs
-                                ? colors.accent
-                                : colors.textPrimary,
-                          },
-                        ]}
-                      >
-                        {yrs} Years {yrs >= 50 ? '🌟 Lifelong' : ''}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
           </View>
 
-          {/* Display Horizon Dropdown */}
+          {/* Display Horizon Trigger */}
           <View style={{ flex: 1, marginLeft: 8 }}>
             <Text style={[styles.fieldLabelSub, { color: colors.textSecondary }]}>
               Visualize on Charts:
             </Text>
             <TouchableOpacity
-              onPress={() =>
-                setHorizonDropdownOpen(horizonDropdownOpen === 'disp' ? null : 'disp')
-              }
+              onPress={() => setHorizonModalMode('disp')}
               style={[
                 styles.dropdownTrigger,
                 { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
               ]}
+              activeOpacity={0.7}
             >
               <Text style={[styles.dropdownTriggerText, { color: colors.textPrimary }]}>
                 {inputs.displayHorizon || 30} Years
               </Text>
-              <Text style={{ color: colors.accent, fontWeight: '700' }}>▾</Text>
+              <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>▾</Text>
             </TouchableOpacity>
-
-            {horizonDropdownOpen === 'disp' && (
-              <View
-                style={[
-                  styles.dropdownMenu,
-                  { backgroundColor: colors.surfaceCard, borderColor: colors.border },
-                ]}
-              >
-                <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={true}>
-                  {HORIZON_OPTIONS.filter((y) => y <= (inputs.simulationHorizon || 30)).map(
-                    (yrs) => (
-                      <TouchableOpacity
-                        key={yrs}
-                        onPress={() => {
-                          onChangeInputs({ ...inputs, displayHorizon: yrs });
-                          setHorizonDropdownOpen(null);
-                        }}
-                        style={[
-                          styles.dropdownItem,
-                          inputs.displayHorizon === yrs && { backgroundColor: colors.accent + '20' },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.dropdownItemText,
-                            {
-                              color:
-                                inputs.displayHorizon === yrs
-                                  ? colors.accent
-                                  : colors.textPrimary,
-                            },
-                          ]}
-                        >
-                          {yrs} Years
-                        </Text>
-                      </TouchableOpacity>
-                    )
-                  )}
-                </ScrollView>
-              </View>
-            )}
           </View>
         </View>
       </View>
@@ -575,6 +503,107 @@ export const InputSection: React.FC<InputSectionProps> = ({
           })}
         </View>
       </View>
+
+      {/* Dedicated Horizon Selection Modal (Completely Eliminates Z-Index / Overlap Issues) */}
+      <Modal
+        visible={horizonModalMode !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setHorizonModalMode(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: colors.surfaceCard,
+                borderColor: colors.border,
+                shadowColor: colors.cardShadow,
+              },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+                  {horizonModalMode === 'sim'
+                    ? 'Select Simulation Horizon'
+                    : 'Select Display Horizon'}
+                </Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
+                  {horizonModalMode === 'sim'
+                    ? 'How many years the engine calculates behind the scenes (up to 80 years)'
+                    : 'How many years are visualized on the charts'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setHorizonModalMode(null)}
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceElevated }]}
+              >
+                <X size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+              {HORIZON_OPTIONS.filter((opt) =>
+                horizonModalMode === 'disp' ? opt.value <= (inputs.simulationHorizon || 30) : true
+              ).map((opt) => {
+                const currentVal =
+                  horizonModalMode === 'sim'
+                    ? inputs.simulationHorizon || 30
+                    : inputs.displayHorizon || 30;
+                const isSelected = currentVal === opt.value;
+
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    onPress={() => {
+                      if (horizonModalMode === 'sim') {
+                        onChangeInputs({
+                          ...inputs,
+                          simulationHorizon: opt.value,
+                          displayHorizon: Math.min(inputs.displayHorizon || 30, opt.value),
+                        });
+                      } else {
+                        onChangeInputs({ ...inputs, displayHorizon: opt.value });
+                      }
+                      setHorizonModalMode(null);
+                    }}
+                    style={[
+                      styles.horizonOptionItem,
+                      {
+                        backgroundColor: isSelected ? colors.accent + '15' : colors.surfaceElevated,
+                        borderColor: isSelected ? colors.accent : colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    <View>
+                      <Text
+                        style={[
+                          styles.horizonOptionTitle,
+                          { color: isSelected ? colors.accent : colors.textPrimary },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                      <Text style={[styles.horizonOptionDesc, { color: colors.textMuted }]}>
+                        {opt.desc}
+                      </Text>
+                    </View>
+                    {isSelected ? <Check size={18} color={colors.accent} /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setHorizonModalMode(null)}
+              style={[styles.modalCancelBtn, { backgroundColor: colors.surfaceElevated }]}
+            >
+              <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -701,10 +730,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  horizonDropdownRow: {
+  horizonButtonsRow: {
     flexDirection: 'row',
-    position: 'relative',
-    zIndex: 20,
   },
   fieldLabelSub: {
     fontSize: 11,
@@ -723,30 +750,6 @@ const styles = StyleSheet.create({
   dropdownTriggerText: {
     fontSize: 13,
     fontWeight: '700',
-  },
-  dropdownMenu: {
-    position: 'absolute',
-    top: 60,
-    left: 0,
-    right: 0,
-    borderRadius: 10,
-    borderWidth: 1,
-    zIndex: 999,
-    elevation: 8,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    overflow: 'hidden',
-  },
-  dropdownItem: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  dropdownItemText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   foreignSection: {
     marginTop: 14,
@@ -850,5 +853,72 @@ const styles = StyleSheet.create({
   },
   allocStatText: {
     fontSize: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  modalSubtitle: {
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  closeBtn: {
+    padding: 6,
+    borderRadius: 20,
+    marginLeft: 8,
+  },
+  horizonOptionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  horizonOptionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  horizonOptionDesc: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  modalCancelBtn: {
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  modalCancelText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
