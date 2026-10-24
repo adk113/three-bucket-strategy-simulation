@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Wallet, ShieldCheck, TrendingUp } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { PALETTE } from '../../theme/colors';
-import { SupportedCountry, formatCurrency } from '../../utils/currency';
+import { SupportedCountry, formatCurrency, COUNTRY_METAS } from '../../utils/currency';
+import { CrossBorderEquityAllocation } from '../../engine/types';
+import { calculateMultiAssetBlendedB3 } from '../../engine/historicalData';
 
 interface BucketCardsProps {
   initialCorpus: number;
@@ -15,6 +17,7 @@ interface BucketCardsProps {
   b1Years: number;
   b2Years: number;
   baseCountry?: SupportedCountry;
+  multiCountryAllocations?: CrossBorderEquityAllocation[];
   onSelectBucket?: (bucketNum: 1 | 2 | 3) => void;
 }
 
@@ -24,6 +27,7 @@ export const BucketCards: React.FC<BucketCardsProps> = ({
   b1Years,
   b2Years,
   baseCountry = 'IN',
+  multiCountryAllocations = [],
   onSelectBucket,
 }) => {
   const { colors, theme } = useTheme();
@@ -34,6 +38,9 @@ export const BucketCards: React.FC<BucketCardsProps> = ({
   const p3 = Math.max(0, 100 - p1 - p2);
 
   const formatAmount = (val: number) => formatCurrency(val, baseCountry);
+
+  const blendedB3 = calculateMultiAssetBlendedB3(baseCountry, multiCountryAllocations);
+  const totalAllocWeight = Math.max(1, multiCountryAllocations.reduce((acc, c) => acc + c.weight, 0));
 
   return (
     <View style={styles.container}>
@@ -203,15 +210,52 @@ export const BucketCards: React.FC<BucketCardsProps> = ({
           </Text>
 
           <View style={[styles.infoRow, { borderTopColor: colors.borderSubtle }]}>
-            <Text style={[styles.infoKey, { color: colors.textMuted }]}>Horizon:</Text>
-            <Text style={[styles.infoVal, { color: colors.textSecondary }]}>
-              Long-term wealth engine
+            <Text style={[styles.infoKey, { color: colors.textMuted }]}>Exp. Return (μ):</Text>
+            <Text style={[styles.infoVal, { color: PALETTE.bucket3.base, fontWeight: '700' }]}>
+              ~{blendedB3.blendedReturn}% p.a.
             </Text>
           </View>
           <View style={styles.infoRow}>
+            <Text style={[styles.infoKey, { color: colors.textMuted }]}>Volatility (σ):</Text>
+            <Text style={[styles.infoVal, { color: colors.textSecondary }]}>
+              ±{blendedB3.blendedStdDev}%
+            </Text>
+          </View>
+
+          {multiCountryAllocations.length > 0 && (
+            <View style={[styles.blendHoldingsBox, { borderTopColor: colors.borderSubtle }]}>
+              <Text style={[styles.infoKey, { color: colors.textMuted, marginBottom: 5 }]}>
+                Holdings Breakdown:
+              </Text>
+              <View style={styles.blendPillsWrap}>
+                {multiCountryAllocations.map((a) => {
+                  const cMeta = COUNTRY_METAS[a.country] || COUNTRY_METAS.IN;
+                  const allocAmt = Math.round(split.bucket3 * (a.weight / totalAllocWeight));
+                  const allocPct = Math.round((a.weight / totalAllocWeight) * 100);
+                  return (
+                    <View
+                      key={a.country}
+                      style={[
+                        styles.blendPill,
+                        { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+                      ]}
+                    >
+                      <Text style={[styles.blendPillText, { color: colors.textPrimary }]}>
+                        {cMeta.flag} {a.country} {allocPct}% ({formatAmount(allocAmt)})
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          <View style={styles.infoRow}>
             <Text style={[styles.infoKey, { color: colors.textMuted }]}>Instruments:</Text>
             <Text style={[styles.infoVal, { color: colors.textSecondary }]}>
-              {baseCountry === 'IN' ? 'Nifty 50, Flexi-Cap' : 'S&P 500, MSCI World'}
+              {multiCountryAllocations.length > 1
+                ? multiCountryAllocations.map((a) => `${COUNTRY_METAS[a.country]?.flag || ''} ${a.country}`).join(' + ') + ' Equities'
+                : baseCountry === 'IN' ? 'Nifty 50, Flexi-Cap' : 'S&P 500, MSCI World'}
             </Text>
           </View>
         </TouchableOpacity>
@@ -342,5 +386,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'right',
+  },
+  blendHoldingsBox: {
+    paddingTop: 6,
+    paddingBottom: 4,
+    borderTopWidth: 1,
+    marginTop: 2,
+  },
+  blendPillsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  blendPill: {
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  blendPillText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
 });

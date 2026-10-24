@@ -40,6 +40,7 @@ const DEFAULT_INPUTS: SimulationInputs = {
   bucket2Years: 7,
   mode: 'historical',
   baseCountry: 'IN',
+  targetGrowthPercent: 60,
   multiCountryAllocations: [
     { country: 'IN', weight: 60, isManual: false },
     { country: 'US', weight: 40, isManual: false },
@@ -236,6 +237,7 @@ export default function SimulationDashboard() {
             b1Years={inputs.bucket1Years}
             b2Years={inputs.bucket2Years}
             baseCountry={inputs.baseCountry}
+            multiCountryAllocations={inputs.multiCountryAllocations}
             onSelectBucket={(bNum) => setSelectedBucketModal(bNum)}
           />
 

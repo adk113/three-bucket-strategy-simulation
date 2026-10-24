@@ -10,7 +10,19 @@ export function calculateInitialSplit(inputs: SimulationInputs) {
   let b2 = 0;
   let b3 = 0;
 
-  if (inputs.initialCorpus <= targetB1) {
+  if (inputs.targetGrowthPercent !== undefined && inputs.targetGrowthPercent > 0) {
+    const targetPct = Math.min(95, Math.max(5, inputs.targetGrowthPercent));
+    b3 = inputs.initialCorpus * (targetPct / 100);
+    const nonEquity = Math.max(0, inputs.initialCorpus - b3);
+
+    if (nonEquity <= targetB1) {
+      b1 = nonEquity;
+      b2 = 0;
+    } else {
+      b1 = targetB1;
+      b2 = nonEquity - targetB1;
+    }
+  } else if (inputs.initialCorpus <= targetB1) {
     b1 = inputs.initialCorpus;
     b2 = 0;
     b3 = 0;

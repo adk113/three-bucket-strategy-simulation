@@ -17,6 +17,7 @@ export const DEFAULT_PRESETS: SavedStrategy[] = [
       bucket2Years: 7,
       mode: 'historical',
       baseCountry: 'IN',
+      targetGrowthPercent: 60,
       multiCountryAllocations: [
         { country: 'IN', weight: 60, isManual: false },
         { country: 'US', weight: 40, isManual: false },
@@ -40,6 +41,7 @@ export const DEFAULT_PRESETS: SavedStrategy[] = [
       bucket2Years: 6,
       mode: 'historical',
       baseCountry: 'US',
+      targetGrowthPercent: 70,
       multiCountryAllocations: [
         { country: 'US', weight: 70, isManual: false },
         { country: 'EU', weight: 30, isManual: false },
@@ -63,6 +65,7 @@ export const DEFAULT_PRESETS: SavedStrategy[] = [
       bucket2Years: 8,
       mode: 'historical',
       baseCountry: 'IN',
+      targetGrowthPercent: 50,
       multiCountryAllocations: [
         { country: 'IN', weight: 80, isManual: false },
         { country: 'US', weight: 20, isManual: false },

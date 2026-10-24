@@ -27,7 +27,8 @@ import { DatePickerInput } from '../common/DatePickerInput';
 import { CrossBorderEquityAllocation, SimulationInputs } from '../../engine/types';
 import { PALETTE } from '../../theme/colors';
 import { COUNTRY_METAS, SupportedCountry, formatCurrency } from '../../utils/currency';
-import { COUNTRY_PROFILES } from '../../engine/historicalData';
+import { COUNTRY_PROFILES, calculateMultiAssetBlendedB3 } from '../../engine/historicalData';
+import { calculateInitialSplit } from '../../engine/simulationEngine';
 
 interface InputSectionProps {
   inputs: SimulationInputs;
@@ -148,7 +149,53 @@ export const InputSection: React.FC<InputSectionProps> = ({
     onChangeInputs({ ...inputs, multiCountryAllocations: updated });
   };
 
-  const totalAllocWeight = inputs.multiCountryAllocations.reduce((acc, cur) => acc + cur.weight, 0);
+  const split = calculateInitialSplit(inputs);
+  const blendedB3 = calculateMultiAssetBlendedB3(country, inputs.multiCountryAllocations);
+  const totalAllocWeight = Math.max(1, inputs.multiCountryAllocations.reduce((acc, cur) => acc + cur.weight, 0));
+
+  const currentGrowthPct =
+    inputs.targetGrowthPercent ??
+    Math.round((split.bucket3 / Math.max(1, inputs.initialCorpus)) * 100);
+
+  const handleSetGrowthPercent = (pct: number) => {
+    const cleanPct = Math.min(95, Math.max(5, pct));
+    onChangeInputs({ ...inputs, targetGrowthPercent: cleanPct });
+  };
+
+  const handleApplySplitPreset = (preset: '100' | '70_30' | '60_40' | '50_50' | 'equal') => {
+    const list = [...inputs.multiCountryAllocations];
+    if (list.length === 0) return;
+
+    if (preset === '100') {
+      const updated = list.map((a, i) => ({ ...a, weight: i === 0 ? 100 : 0 }));
+      onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+    } else if (preset === '70_30') {
+      const updated = list.map((a, i) => {
+        if (i === 0) return { ...a, weight: 70 };
+        if (i === 1) return { ...a, weight: 30 };
+        return { ...a, weight: 0 };
+      });
+      onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+    } else if (preset === '60_40') {
+      const updated = list.map((a, i) => {
+        if (i === 0) return { ...a, weight: 60 };
+        if (i === 1) return { ...a, weight: 40 };
+        return { ...a, weight: 0 };
+      });
+      onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+    } else if (preset === '50_50') {
+      const updated = list.map((a, i) => {
+        if (i === 0) return { ...a, weight: 50 };
+        if (i === 1) return { ...a, weight: 50 };
+        return { ...a, weight: 0 };
+      });
+      onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+    } else if (preset === 'equal') {
+      const share = Math.round(100 / list.length);
+      const updated = list.map((a) => ({ ...a, weight: share }));
+      onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+    }
+  };
 
   return (
     <View
@@ -372,11 +419,14 @@ export const InputSection: React.FC<InputSectionProps> = ({
       <View style={[styles.foreignSection, { borderTopColor: colors.borderSubtle }]}>
         <View style={styles.foreignHeader}>
           <View>
-            <Text style={[styles.subSectionTitle, { color: colors.textPrimary }]}>
-              Multi-Country Equity Blend (Bucket 3)
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Globe2 size={16} color={PALETTE.bucket3.base} style={{ marginRight: 6 }} />
+              <Text style={[styles.subSectionTitle, { color: colors.textPrimary }]}>
+                Multi-Country Equity Blend (Bucket 3)
+              </Text>
+            </View>
             <Text style={[styles.foreignDesc, { color: colors.textMuted }]}>
-              Weight multiple markets simultaneously. Total Weight: {totalAllocWeight}%
+              Blended Return: ~{blendedB3.blendedReturn}% μ • Volatility: ±{blendedB3.blendedStdDev}% σ
             </Text>
           </View>
 
@@ -398,11 +448,120 @@ export const InputSection: React.FC<InputSectionProps> = ({
           </View>
         </View>
 
+        {/* Growth Bucket (Equity % of Corpus) Control */}
+        <View
+          style={[
+            styles.targetEquityCard,
+            { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+          ]}
+        >
+          <View style={styles.targetEquityTopRow}>
+            <View>
+              <Text style={[styles.targetEquityTitle, { color: colors.textPrimary }]}>
+                Target Growth Bucket (Equity % of Corpus)
+              </Text>
+              <Text style={[styles.targetEquitySubtitle, { color: colors.textMuted }]}>
+                Allocated to Bucket 3: {formatCurrency(split.bucket3, country)} ({currentGrowthPct}% of Total Corpus)
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.growthPctBadge,
+                { backgroundColor: PALETTE.bucket3.base + '20', borderColor: PALETTE.bucket3.base },
+              ]}
+            >
+              <Text style={[styles.growthPctBadgeText, { color: PALETTE.bucket3.base }]}>
+                {currentGrowthPct}% Equity
+              </Text>
+            </View>
+          </View>
+
+          {/* Quick Selectable Equity % Chips */}
+          <View style={styles.equityPresetChipsRow}>
+            {[30, 40, 50, 60, 70, 80].map((pct) => {
+              const isSelected = currentGrowthPct === pct;
+              return (
+                <TouchableOpacity
+                  key={pct}
+                  onPress={() => handleSetGrowthPercent(pct)}
+                  style={[
+                    styles.equityPresetChip,
+                    {
+                      backgroundColor: isSelected ? PALETTE.bucket3.base : colors.surfaceCard,
+                      borderColor: isSelected ? PALETTE.bucket3.base : colors.borderSubtle,
+                    },
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.equityPresetChipText,
+                      { color: isSelected ? '#FFFFFF' : colors.textPrimary },
+                    ]}
+                  >
+                    {pct}%
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Quick Country Blend Presets */}
+        <View style={styles.presetSplitsRow}>
+          <Text style={[styles.fieldLabelSub, { color: colors.textMuted, marginRight: 6 }]}>
+            Blend Presets:
+          </Text>
+          <TouchableOpacity
+            onPress={() => handleApplySplitPreset('100')}
+            style={[styles.presetSplitBtn, { backgroundColor: colors.surfaceElevated }]}
+          >
+            <Text style={[styles.presetSplitBtnText, { color: colors.textSecondary }]}>
+              100% {country}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleApplySplitPreset('70_30')}
+            style={[styles.presetSplitBtn, { backgroundColor: colors.surfaceElevated }]}
+          >
+            <Text style={[styles.presetSplitBtnText, { color: colors.textSecondary }]}>
+              70 / 30
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleApplySplitPreset('60_40')}
+            style={[styles.presetSplitBtn, { backgroundColor: colors.surfaceElevated }]}
+          >
+            <Text style={[styles.presetSplitBtnText, { color: colors.textSecondary }]}>
+              60 / 40
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleApplySplitPreset('50_50')}
+            style={[styles.presetSplitBtn, { backgroundColor: colors.surfaceElevated }]}
+          >
+            <Text style={[styles.presetSplitBtnText, { color: colors.textSecondary }]}>
+              50 / 50
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleApplySplitPreset('equal')}
+            style={[styles.presetSplitBtn, { backgroundColor: colors.surfaceElevated }]}
+          >
+            <Text style={[styles.presetSplitBtnText, { color: colors.textSecondary }]}>
+              Equal
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* List of active country equity allocations */}
         <View style={styles.allocList}>
           {inputs.multiCountryAllocations.map((alloc, idx) => {
             const cMeta = COUNTRY_METAS[alloc.country];
             const defaultProfile = COUNTRY_PROFILES[alloc.country].bucket3;
+            const allocAmt = Math.round(split.bucket3 * (alloc.weight / totalAllocWeight));
+            const allocPortionPct = ((alloc.weight / totalAllocWeight) * currentGrowthPct).toFixed(1);
 
             return (
               <View
@@ -413,10 +572,15 @@ export const InputSection: React.FC<InputSectionProps> = ({
                 ]}
               >
                 <View style={styles.allocCardTop}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 16, marginRight: 6 }}>{cMeta.flag}</Text>
-                    <Text style={[styles.allocCountryName, { color: colors.textPrimary }]}>
-                      {cMeta.name} Equity
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 16, marginRight: 6 }}>{cMeta.flag}</Text>
+                      <Text style={[styles.allocCountryName, { color: colors.textPrimary }]}>
+                        {cMeta.name} Equity
+                      </Text>
+                    </View>
+                    <Text style={[styles.allocSubAmount, { color: colors.textMuted }]}>
+                      {formatCurrency(allocAmt, country)} • {allocPortionPct}% of Portfolio
                     </Text>
                   </View>
 
@@ -460,6 +624,35 @@ export const InputSection: React.FC<InputSectionProps> = ({
                       </TouchableOpacity>
                     )}
                   </View>
+                </View>
+
+                {/* Quick country weight chips */}
+                <View style={styles.quickWeightRow}>
+                  {[25, 30, 40, 50, 60, 70, 100].map((w) => (
+                    <TouchableOpacity
+                      key={w}
+                      onPress={() => handleUpdateWeight(idx, w.toString())}
+                      style={[
+                        styles.quickWeightChip,
+                        alloc.weight === w && {
+                          backgroundColor: PALETTE.bucket3.base + '25',
+                          borderColor: PALETTE.bucket3.base,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.quickWeightChipText,
+                          {
+                            color:
+                              alloc.weight === w ? PALETTE.bucket3.base : colors.textMuted,
+                          },
+                        ]}
+                      >
+                        {w}%
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
 
                 {/* Sub row showing empirical or manual numbers */}
@@ -853,6 +1046,90 @@ const styles = StyleSheet.create({
   },
   allocStatText: {
     fontSize: 10,
+  },
+  targetEquityCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 10,
+  },
+  targetEquityTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  targetEquityTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  targetEquitySubtitle: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  growthPctBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  growthPctBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  equityPresetChipsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  equityPresetChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  equityPresetChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  presetSplitsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  presetSplitBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  presetSplitBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  allocSubAmount: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  quickWeightRow: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 8,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  quickWeightChip: {
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  quickWeightChipText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,

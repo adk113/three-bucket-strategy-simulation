@@ -19,6 +19,7 @@ export interface SimulationInputs {
 
   // Base Market & Multi-Country Cross-Border Settings
   baseCountry: SupportedCountry; // 'IN' | 'US' | 'UK' | 'EU'
+  targetGrowthPercent?: number; // Target Equity / Growth Bucket % of corpus (e.g. 60%)
   multiCountryAllocations: CrossBorderEquityAllocation[];
 
   // Ultra-Long Variable Time Horizons (up to 80 years)
