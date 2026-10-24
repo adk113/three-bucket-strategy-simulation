@@ -1,4 +1,4 @@
-import { COUNTRY_PROFILES, calculateBlendedBucket3 } from './historicalData';
+import { COUNTRY_PROFILES, calculateMultiAssetBlendedB3 } from './historicalData';
 import { runDeterministicSimulation } from './simulationEngine';
 import { MonteCarloSummary, SimulationInputs } from './types';
 
@@ -16,13 +16,12 @@ export function runMonteCarloSimulation(
   runs = 500
 ): MonteCarloSummary {
   const countryProfile = COUNTRY_PROFILES[inputs.baseCountry || 'IN'] || COUNTRY_PROFILES.IN;
-  const blendedB3 = calculateBlendedBucket3(
+  const blendedB3 = calculateMultiAssetBlendedB3(
     inputs.baseCountry || 'IN',
-    inputs.foreignCountry || 'US',
-    inputs.foreignAllocationPercent || 0
+    inputs.multiCountryAllocations
   );
 
-  const horizon = Math.max(10, Math.min(60, inputs.simulationHorizon || 30));
+  const horizon = Math.max(10, Math.min(80, inputs.simulationHorizon || 30));
 
   const mu1 =
     inputs.mode === 'manual'
@@ -42,7 +41,7 @@ export function runMonteCarloSimulation(
       : blendedB3.blendedReturn / 100;
   const sigma3 = blendedB3.blendedStdDev / 100;
 
-  // Volatility reduction from foreign diversification
+  // Diversification benefit compared to 100% domestic equity
   const domesticB3StdDev = countryProfile.bucket3.stdDev;
   const volReduction = Number((domesticB3StdDev - blendedB3.blendedStdDev).toFixed(2));
 

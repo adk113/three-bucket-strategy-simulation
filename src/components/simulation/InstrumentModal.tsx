@@ -1,27 +1,36 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
-import { X } from 'lucide-react-native';
+import { X, ShieldAlert, Award } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { COUNTRY_PROFILES } from '../../engine/historicalData';
 import { PALETTE } from '../../theme/colors';
-import { SupportedCountry } from '../../utils/currency';
+import { COUNTRY_METAS, SupportedCountry } from '../../utils/currency';
 
 interface InstrumentModalProps {
   bucketNum: 1 | 2 | 3 | null;
   baseCountry?: SupportedCountry;
+  activeCountries?: SupportedCountry[];
   onClose: () => void;
 }
 
 export const InstrumentModal: React.FC<InstrumentModalProps> = ({
   bucketNum,
   baseCountry = 'IN',
+  activeCountries = ['IN', 'US'],
   onClose,
 }) => {
   const { colors } = useTheme();
 
+  // Deduplicate countries list
+  const uniqueCountries = Array.from(new Set([baseCountry, ...activeCountries]));
+  const [selectedCountryTab, setSelectedCountryTab] = useState<SupportedCountry>(baseCountry);
+
   if (!bucketNum) return null;
 
-  const countryProfile = COUNTRY_PROFILES[baseCountry] || COUNTRY_PROFILES.IN;
+  const currentCountry = uniqueCountries.includes(selectedCountryTab)
+    ? selectedCountryTab
+    : baseCountry;
+  const countryProfile = COUNTRY_PROFILES[currentCountry] || COUNTRY_PROFILES.IN;
   const configKey = bucketNum === 1 ? 'bucket1' : bucketNum === 2 ? 'bucket2' : 'bucket3';
   const data = countryProfile[configKey];
   const bucketColor =
@@ -48,11 +57,10 @@ export const InstrumentModal: React.FC<InstrumentModalProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: bucketColor }]}>
                 {bucketNum === 1
-                  ? 'Bucket 1: Cash Liquidity'
+                  ? 'Bucket 1: Cash Liquidity (Years 1–3)'
                   : bucketNum === 2
-                  ? 'Bucket 2: Stability & Income'
-                  : 'Bucket 3: Long-Term Growth'}{' '}
-                ({countryProfile.name})
+                  ? 'Bucket 2: Stability & Income (Years 4–10)'
+                  : 'Bucket 3: Long-Term Growth (Years 11–80+)'}
               </Text>
               <Text style={[styles.subtitle, { color: colors.textMuted }]}>{data.role}</Text>
             </View>
@@ -61,9 +69,41 @@ export const InstrumentModal: React.FC<InstrumentModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+          {/* Country Switcher Tabs */}
+          <View style={styles.countryTabsRow}>
+            <Text style={[styles.tabLabel, { color: colors.textSecondary }]}>Market:</Text>
+            {uniqueCountries.map((cCode) => {
+              const cMeta = COUNTRY_METAS[cCode];
+              const isSelected = currentCountry === cCode;
+              return (
+                <TouchableOpacity
+                  key={cCode}
+                  onPress={() => setSelectedCountryTab(cCode)}
+                  style={[
+                    styles.cTab,
+                    {
+                      backgroundColor: isSelected ? bucketColor : colors.surfaceElevated,
+                      borderColor: isSelected ? bucketColor : colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text style={{ fontSize: 13, marginRight: 4 }}>{cMeta.flag}</Text>
+                  <Text
+                    style={[
+                      styles.cTabText,
+                      { color: isSelected ? '#FFFFFF' : colors.textPrimary },
+                    ]}
+                  >
+                    {cMeta.name} {cCode === baseCountry ? '(Base)' : ''}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <ScrollView style={{ maxHeight: 390 }} showsVerticalScrollIndicator={false}>
             <Text style={[styles.sectionHeading, { color: colors.textPrimary }]}>
-              Recommended Vehicles for {countryProfile.name}
+              Recommended Vehicles & Tax Structures ({countryProfile.name})
             </Text>
 
             {data.instruments.map((item, idx) => (
@@ -89,6 +129,15 @@ export const InstrumentModal: React.FC<InstrumentModalProps> = ({
                 <Text style={[styles.instDesc, { color: colors.textSecondary }]}>
                   {item.description}
                 </Text>
+
+                {item.taxStructure ? (
+                  <View style={styles.taxBox}>
+                    <Award size={12} color={colors.accent} style={{ marginRight: 4 }} />
+                    <Text style={[styles.taxText, { color: colors.accent }]}>
+                      Tax Treatment: {item.taxStructure}
+                    </Text>
+                  </View>
+                ) : null}
 
                 <View style={styles.metricsRow}>
                   <View style={styles.metricPair}>
@@ -118,7 +167,7 @@ export const InstrumentModal: React.FC<InstrumentModalProps> = ({
             onPress={onClose}
             style={[styles.doneBtn, { backgroundColor: bucketColor }]}
           >
-            <Text style={styles.doneBtnText}>Close</Text>
+            <Text style={styles.doneBtnText}>Close Vehicle Details</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -136,7 +185,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     width: '100%',
-    maxWidth: 500,
+    maxWidth: 540,
     borderRadius: 20,
     borderWidth: 1,
     padding: 20,
@@ -149,23 +198,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
   },
   subtitle: {
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 3,
     lineHeight: 16,
   },
   closeBtn: {
     padding: 6,
     marginLeft: 10,
   },
+  countryTabsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    flexWrap: 'wrap',
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginRight: 4,
+  },
+  cTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  cTabText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
   sectionHeading: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     marginBottom: 10,
     textTransform: 'uppercase',
@@ -184,7 +260,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   instName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     flex: 1,
   },
@@ -199,9 +275,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   instDesc: {
-    fontSize: 12,
-    lineHeight: 16,
-    marginBottom: 8,
+    fontSize: 11,
+    lineHeight: 15,
+    marginBottom: 6,
+  },
+  taxBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  taxText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   metricsRow: {
     flexDirection: 'row',
@@ -216,22 +301,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   mKey: {
-    fontSize: 11,
+    fontSize: 10,
     marginRight: 4,
   },
   mVal: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
   doneBtn: {
     paddingVertical: 11,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 14,
+    marginTop: 12,
   },
   doneBtnText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
 });

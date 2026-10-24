@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Switch,
+  ScrollView,
 } from 'react-native';
 import {
   Sparkles,
@@ -13,28 +14,38 @@ import {
   History,
   Globe2,
   CalendarDays,
-  Percent,
+  HelpCircle,
+  Plus,
+  Trash2,
+  Settings2,
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { DatePickerInput } from '../common/DatePickerInput';
-import { SimulationInputs } from '../../engine/types';
+import { CrossBorderEquityAllocation, SimulationInputs } from '../../engine/types';
 import { PALETTE } from '../../theme/colors';
 import { COUNTRY_METAS, SupportedCountry, formatCurrency } from '../../utils/currency';
+import { COUNTRY_PROFILES } from '../../engine/historicalData';
 
 interface InputSectionProps {
   inputs: SimulationInputs;
   onChangeInputs: (newInputs: SimulationInputs) => void;
   onSuggestSafeWithdrawal: () => void;
+  onOpenEducationModal: () => void;
 }
+
+const HORIZON_OPTIONS = [10, 15, 20, 25, 30, 40, 50, 60, 70, 80];
 
 export const InputSection: React.FC<InputSectionProps> = ({
   inputs,
   onChangeInputs,
   onSuggestSafeWithdrawal,
+  onOpenEducationModal,
 }) => {
   const { colors } = useTheme();
   const country = inputs.baseCountry || 'IN';
   const meta = COUNTRY_METAS[country] || COUNTRY_METAS.IN;
+
+  const [horizonDropdownOpen, setHorizonDropdownOpen] = useState<'sim' | 'disp' | null>(null);
 
   const handleCorpusChange = (text: string) => {
     const clean = text.replace(/[^0-9]/g, '');
@@ -56,18 +67,74 @@ export const InputSection: React.FC<InputSectionProps> = ({
     });
   };
 
-  const handleCountryChange = (newCountry: SupportedCountry) => {
+  const handleBaseCountryChange = (newCountry: SupportedCountry) => {
     const newMeta = COUNTRY_METAS[newCountry];
-    const foreign = newCountry === 'US' ? 'IN' : 'US';
+    // Re-seed multi-country allocation with Base 60% and secondary 40%
+    const defaultSec = newCountry === 'US' ? 'IN' : 'US';
+    const newAllocs: CrossBorderEquityAllocation[] = [
+      { country: newCountry, weight: 60, isManual: false },
+      { country: defaultSec, weight: 40, isManual: false },
+    ];
+
     onChangeInputs({
       ...inputs,
       baseCountry: newCountry,
-      foreignCountry: foreign,
+      multiCountryAllocations: newAllocs,
       inflationRate: newMeta.defaultInflation,
       initialCorpus: newMeta.defaultCorpus,
       monthlyWithdrawal: newMeta.defaultWithdrawal,
     });
   };
+
+  // Multi-country allocation helpers
+  const handleUpdateWeight = (idx: number, newWeightStr: string) => {
+    const w = parseInt(newWeightStr.replace(/[^0-9]/g, ''), 10) || 0;
+    const updated = [...inputs.multiCountryAllocations];
+    updated[idx] = { ...updated[idx], weight: Math.min(100, Math.max(0, w)) };
+    onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+  };
+
+  const handleToggleManualCountry = (idx: number, isManual: boolean) => {
+    const updated = [...inputs.multiCountryAllocations];
+    const item = updated[idx];
+    const defaultData = COUNTRY_PROFILES[item.country].bucket3;
+    updated[idx] = {
+      ...item,
+      isManual,
+      customReturn: isManual ? defaultData.nominalReturnMean : undefined,
+      customStdDev: isManual ? defaultData.stdDev : undefined,
+    };
+    onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+  };
+
+  const handleUpdateCustomMetrics = (
+    idx: number,
+    field: 'return' | 'stdDev',
+    valStr: string
+  ) => {
+    const val = parseFloat(valStr) || 0;
+    const updated = [...inputs.multiCountryAllocations];
+    if (field === 'return') {
+      updated[idx] = { ...updated[idx], customReturn: val };
+    } else {
+      updated[idx] = { ...updated[idx], customStdDev: val };
+    }
+    onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+  };
+
+  const handleAddCountryToEquity = (c: SupportedCountry) => {
+    if (inputs.multiCountryAllocations.some((a) => a.country === c)) return;
+    const updated = [...inputs.multiCountryAllocations, { country: c, weight: 20, isManual: false }];
+    onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+  };
+
+  const handleRemoveCountry = (idx: number) => {
+    if (inputs.multiCountryAllocations.length <= 1) return;
+    const updated = inputs.multiCountryAllocations.filter((_, i) => i !== idx);
+    onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+  };
+
+  const totalAllocWeight = inputs.multiCountryAllocations.reduce((acc, cur) => acc + cur.weight, 0);
 
   return (
     <View
@@ -96,7 +163,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
             return (
               <TouchableOpacity
                 key={cCode}
-                onPress={() => handleCountryChange(cCode)}
+                onPress={() => handleBaseCountryChange(cCode)}
                 style={[
                   styles.countryChip,
                   {
@@ -224,263 +291,289 @@ export const InputSection: React.FC<InputSectionProps> = ({
         </View>
       </View>
 
-      {/* 4. Variable Time Horizons Config */}
+      {/* 4. Ultra-Long Time Horizons (Dropdown up to 80 Years) */}
       <View style={[styles.horizonSection, { borderTopColor: colors.borderSubtle }]}>
         <View style={styles.horizonHeader}>
-          <CalendarDays size={16} color={colors.accent} style={{ marginRight: 6 }} />
-          <Text style={[styles.subSectionTitle, { color: colors.textPrimary }]}>
-            Simulation & Display Horizons
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <CalendarDays size={16} color={colors.accent} style={{ marginRight: 6 }} />
+            <Text style={[styles.subSectionTitle, { color: colors.textPrimary }]}>
+              Time Horizons (Up to 80 Years)
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={onOpenEducationModal}
+            style={styles.infoBadge}
+            activeOpacity={0.7}
+          >
+            <HelpCircle size={14} color={colors.accent} style={{ marginRight: 4 }} />
+            <Text style={[styles.infoBadgeText, { color: colors.accent }]}>Methodology</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.horizonRow}>
-          {/* Simulation Horizon */}
+        <View style={styles.horizonDropdownRow}>
+          {/* Simulation Horizon Dropdown */}
           <View style={{ flex: 1, marginRight: 8 }}>
             <Text style={[styles.fieldLabelSub, { color: colors.textSecondary }]}>
               Simulate Backend:
             </Text>
-            <View style={styles.horizonChips}>
-              {[25, 30, 40, 50].map((yrs) => {
-                const isSelected = (inputs.simulationHorizon || 30) === yrs;
-                return (
-                  <TouchableOpacity
-                    key={yrs}
-                    onPress={() =>
-                      onChangeInputs({
-                        ...inputs,
-                        simulationHorizon: yrs,
-                        displayHorizon: Math.min(inputs.displayHorizon || 30, yrs),
-                      })
-                    }
-                    style={[
-                      styles.horizonChip,
-                      {
-                        backgroundColor: isSelected ? colors.accent : colors.surfaceElevated,
-                        borderColor: isSelected ? colors.accent : colors.borderSubtle,
-                      },
-                    ]}
-                  >
-                    <Text
+            <TouchableOpacity
+              onPress={() =>
+                setHorizonDropdownOpen(horizonDropdownOpen === 'sim' ? null : 'sim')
+              }
+              style={[
+                styles.dropdownTrigger,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+              ]}
+            >
+              <Text style={[styles.dropdownTriggerText, { color: colors.textPrimary }]}>
+                {inputs.simulationHorizon || 30} Years
+              </Text>
+              <Text style={{ color: colors.accent, fontWeight: '700' }}>▾</Text>
+            </TouchableOpacity>
+
+            {horizonDropdownOpen === 'sim' && (
+              <View
+                style={[
+                  styles.dropdownMenu,
+                  { backgroundColor: colors.surfaceCard, borderColor: colors.border },
+                ]}
+              >
+                <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={true}>
+                  {HORIZON_OPTIONS.map((yrs) => (
+                    <TouchableOpacity
+                      key={yrs}
+                      onPress={() => {
+                        onChangeInputs({
+                          ...inputs,
+                          simulationHorizon: yrs,
+                          displayHorizon: Math.min(inputs.displayHorizon || 30, yrs),
+                        });
+                        setHorizonDropdownOpen(null);
+                      }}
                       style={[
-                        styles.horizonChipText,
-                        { color: isSelected ? '#FFFFFF' : colors.textPrimary },
+                        styles.dropdownItem,
+                        inputs.simulationHorizon === yrs && { backgroundColor: colors.accent + '20' },
                       ]}
                     >
-                      {yrs}y
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                      <Text
+                        style={[
+                          styles.dropdownItemText,
+                          {
+                            color:
+                              inputs.simulationHorizon === yrs
+                                ? colors.accent
+                                : colors.textPrimary,
+                          },
+                        ]}
+                      >
+                        {yrs} Years {yrs >= 50 ? '🌟 Lifelong' : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
           </View>
 
-          {/* Display Horizon */}
+          {/* Display Horizon Dropdown */}
           <View style={{ flex: 1, marginLeft: 8 }}>
             <Text style={[styles.fieldLabelSub, { color: colors.textSecondary }]}>
               Visualize on Charts:
             </Text>
-            <View style={styles.horizonChips}>
-              {[10, 15, 20, 30].map((yrs) => {
-                const isSelected = (inputs.displayHorizon || 30) === yrs;
-                return (
-                  <TouchableOpacity
-                    key={yrs}
-                    onPress={() => onChangeInputs({ ...inputs, displayHorizon: yrs })}
-                    style={[
-                      styles.horizonChip,
-                      {
-                        backgroundColor: isSelected ? colors.accent : colors.surfaceElevated,
-                        borderColor: isSelected ? colors.accent : colors.borderSubtle,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.horizonChipText,
-                        { color: isSelected ? '#FFFFFF' : colors.textPrimary },
-                      ]}
-                    >
-                      {yrs}y
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <TouchableOpacity
+              onPress={() =>
+                setHorizonDropdownOpen(horizonDropdownOpen === 'disp' ? null : 'disp')
+              }
+              style={[
+                styles.dropdownTrigger,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+              ]}
+            >
+              <Text style={[styles.dropdownTriggerText, { color: colors.textPrimary }]}>
+                {inputs.displayHorizon || 30} Years
+              </Text>
+              <Text style={{ color: colors.accent, fontWeight: '700' }}>▾</Text>
+            </TouchableOpacity>
+
+            {horizonDropdownOpen === 'disp' && (
+              <View
+                style={[
+                  styles.dropdownMenu,
+                  { backgroundColor: colors.surfaceCard, borderColor: colors.border },
+                ]}
+              >
+                <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={true}>
+                  {HORIZON_OPTIONS.filter((y) => y <= (inputs.simulationHorizon || 30)).map(
+                    (yrs) => (
+                      <TouchableOpacity
+                        key={yrs}
+                        onPress={() => {
+                          onChangeInputs({ ...inputs, displayHorizon: yrs });
+                          setHorizonDropdownOpen(null);
+                        }}
+                        style={[
+                          styles.dropdownItem,
+                          inputs.displayHorizon === yrs && { backgroundColor: colors.accent + '20' },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.dropdownItemText,
+                            {
+                              color:
+                                inputs.displayHorizon === yrs
+                                  ? colors.accent
+                                  : colors.textPrimary,
+                            },
+                          ]}
+                        >
+                          {yrs} Years
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  )}
+                </ScrollView>
+              </View>
+            )}
           </View>
         </View>
       </View>
 
-      {/* 5. Cross-Border Portfolio Modeling (Foreign Allocation) */}
+      {/* 5. Multi-Country & Multi-Asset Cross-Border Allocation (Bucket 3) */}
       <View style={[styles.foreignSection, { borderTopColor: colors.borderSubtle }]}>
         <View style={styles.foreignHeader}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Globe2 size={16} color={PALETTE.bucket3.base} style={{ marginRight: 6 }} />
+          <View>
             <Text style={[styles.subSectionTitle, { color: colors.textPrimary }]}>
-              Cross-Border Equity Allocation (Bucket 3)
+              Multi-Country Equity Blend (Bucket 3)
+            </Text>
+            <Text style={[styles.foreignDesc, { color: colors.textMuted }]}>
+              Weight multiple markets simultaneously. Total Weight: {totalAllocWeight}%
             </Text>
           </View>
-          <Text style={[styles.foreignPctLabel, { color: PALETTE.bucket3.base }]}>
-            {inputs.foreignAllocationPercent || 0}% Foreign
-          </Text>
-        </View>
 
-        <Text style={[styles.foreignDesc, { color: colors.textMuted }]}>
-          Invest a percentage of High-Growth Equities into a secondary international market:
-        </Text>
-
-        <View style={styles.foreignControlsRow}>
-          {/* Secondary Country Selector */}
-          <View style={styles.foreignCountrySelector}>
-            {(['US', 'IN', 'EU', 'UK'] as SupportedCountry[])
-              .filter((c) => c !== country)
-              .slice(0, 3)
-              .map((scCode) => {
-                const scMeta = COUNTRY_METAS[scCode];
-                const isSelected = inputs.foreignCountry === scCode;
-                return (
-                  <TouchableOpacity
-                    key={scCode}
-                    onPress={() => onChangeInputs({ ...inputs, foreignCountry: scCode })}
-                    style={[
-                      styles.secCountryChip,
-                      {
-                        backgroundColor: isSelected ? PALETTE.bucket3.base : colors.surfaceElevated,
-                        borderColor: isSelected ? PALETTE.bucket3.base : colors.borderSubtle,
-                      },
-                    ]}
-                  >
-                    <Text style={styles.flagText}>{scMeta.flag}</Text>
-                    <Text
-                      style={[
-                        styles.secCountryText,
-                        { color: isSelected ? '#FFFFFF' : colors.textPrimary },
-                      ]}
-                    >
-                      {scMeta.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-          </View>
-
-          {/* Allocation % Chips */}
-          <View style={styles.foreignPctChips}>
-            {[0, 15, 25, 35, 50].map((pct) => {
-              const isSelected = (inputs.foreignAllocationPercent || 0) === pct;
-              return (
+          <View style={styles.addCountryRow}>
+            {(['IN', 'US', 'UK', 'EU'] as SupportedCountry[])
+              .filter((c) => !inputs.multiCountryAllocations.some((a) => a.country === c))
+              .map((c) => (
                 <TouchableOpacity
-                  key={pct}
-                  onPress={() => onChangeInputs({ ...inputs, foreignAllocationPercent: pct })}
-                  style={[
-                    styles.pctChip,
-                    {
-                      backgroundColor: isSelected ? PALETTE.bucket3.base : colors.surfaceElevated,
-                      borderColor: isSelected ? PALETTE.bucket3.base : colors.borderSubtle,
-                    },
-                  ]}
+                  key={c}
+                  onPress={() => handleAddCountryToEquity(c)}
+                  style={[styles.addChip, { backgroundColor: colors.surfaceElevated }]}
                 >
-                  <Text
-                    style={[
-                      styles.pctChipText,
-                      { color: isSelected ? '#FFFFFF' : colors.textPrimary },
-                    ]}
-                  >
-                    {pct}%
+                  <Plus size={12} color={colors.accent} />
+                  <Text style={[styles.addChipText, { color: colors.textPrimary }]}>
+                    {COUNTRY_METAS[c].flag} {c}
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      </View>
-
-      {/* 6. ROI Mode Switcher: Historical vs Manual */}
-      <View style={[styles.roiSection, { borderTopColor: colors.borderSubtle }]}>
-        <View style={styles.roiHeaderRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {inputs.mode === 'historical' ? (
-              <History size={16} color={colors.accent} style={{ marginRight: 6 }} />
-            ) : (
-              <Sliders size={16} color={colors.accent} style={{ marginRight: 6 }} />
-            )}
-            <Text style={[styles.roiTitle, { color: colors.textPrimary }]}>
-              {inputs.mode === 'historical'
-                ? `Historical Empirical Model (${meta.name})`
-                : 'Manual ROI Overrides'}
-            </Text>
-          </View>
-
-          <View style={styles.toggleRow}>
-            <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>
-              {inputs.mode === 'historical' ? 'Historical' : 'Manual'}
-            </Text>
-            <Switch
-              value={inputs.mode === 'manual'}
-              onValueChange={(isManual) =>
-                onChangeInputs({
-                  ...inputs,
-                  mode: isManual ? 'manual' : 'historical',
-                })
-              }
-              thumbColor={colors.accent}
-              trackColor={{ false: colors.surfaceElevated, true: colors.accent + '60' }}
-            />
+              ))}
           </View>
         </View>
 
-        {inputs.mode === 'manual' ? (
-          <View style={styles.manualSlidersContainer}>
-            <View style={styles.sliderGrid}>
-              <View style={styles.roiPill}>
-                <Text style={[styles.roiPillLabel, { color: PALETTE.bucket1.base }]}>B1 (Cash)</Text>
-                <TextInput
-                  style={[styles.roiPillInput, { color: colors.textPrimary, borderColor: colors.inputBorder }]}
-                  value={inputs.manualReturns.bucket1.toString()}
-                  onChangeText={(val) =>
-                    onChangeInputs({
-                      ...inputs,
-                      manualReturns: { ...inputs.manualReturns, bucket1: parseFloat(val) || 0 },
-                    })
-                  }
-                  keyboardType="decimal-pad"
-                />
-                <Text style={{ color: colors.textMuted }}>%</Text>
-              </View>
+        {/* List of active country equity allocations */}
+        <View style={styles.allocList}>
+          {inputs.multiCountryAllocations.map((alloc, idx) => {
+            const cMeta = COUNTRY_METAS[alloc.country];
+            const defaultProfile = COUNTRY_PROFILES[alloc.country].bucket3;
 
-              <View style={styles.roiPill}>
-                <Text style={[styles.roiPillLabel, { color: PALETTE.bucket2.base }]}>B2 (Stable)</Text>
-                <TextInput
-                  style={[styles.roiPillInput, { color: colors.textPrimary, borderColor: colors.inputBorder }]}
-                  value={inputs.manualReturns.bucket2.toString()}
-                  onChangeText={(val) =>
-                    onChangeInputs({
-                      ...inputs,
-                      manualReturns: { ...inputs.manualReturns, bucket2: parseFloat(val) || 0 },
-                    })
-                  }
-                  keyboardType="decimal-pad"
-                />
-                <Text style={{ color: colors.textMuted }}>%</Text>
-              </View>
+            return (
+              <View
+                key={alloc.country}
+                style={[
+                  styles.allocCard,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+                ]}
+              >
+                <View style={styles.allocCardTop}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 16, marginRight: 6 }}>{cMeta.flag}</Text>
+                    <Text style={[styles.allocCountryName, { color: colors.textPrimary }]}>
+                      {cMeta.name} Equity
+                    </Text>
+                  </View>
 
-              <View style={styles.roiPill}>
-                <Text style={[styles.roiPillLabel, { color: PALETTE.bucket3.base }]}>B3 (Growth)</Text>
-                <TextInput
-                  style={[styles.roiPillInput, { color: colors.textPrimary, borderColor: colors.inputBorder }]}
-                  value={inputs.manualReturns.bucket3.toString()}
-                  onChangeText={(val) =>
-                    onChangeInputs({
-                      ...inputs,
-                      manualReturns: { ...inputs.manualReturns, bucket3: parseFloat(val) || 0 },
-                    })
-                  }
-                  keyboardType="decimal-pad"
-                />
-                <Text style={{ color: colors.textMuted }}>%</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {/* Weight Input */}
+                    <View style={styles.weightBox}>
+                      <TextInput
+                        style={[
+                          styles.weightInput,
+                          { color: colors.textPrimary, borderColor: colors.borderSubtle },
+                        ]}
+                        value={alloc.weight.toString()}
+                        onChangeText={(txt) => handleUpdateWeight(idx, txt)}
+                        keyboardType="number-pad"
+                      />
+                      <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 11 }}>
+                        %
+                      </Text>
+                    </View>
+
+                    {/* Manual Mode Toggle */}
+                    <TouchableOpacity
+                      onPress={() => handleToggleManualCountry(idx, !alloc.isManual)}
+                      style={[
+                        styles.manualIconBtn,
+                        alloc.isManual && { backgroundColor: PALETTE.bucket3.base },
+                      ]}
+                    >
+                      <Settings2
+                        size={14}
+                        color={alloc.isManual ? '#FFFFFF' : colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+
+                    {inputs.multiCountryAllocations.length > 1 && (
+                      <TouchableOpacity
+                        onPress={() => handleRemoveCountry(idx)}
+                        style={styles.trashBtn}
+                      >
+                        <Trash2 size={14} color="#EF4444" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                {/* Sub row showing empirical or manual numbers */}
+                {alloc.isManual ? (
+                  <View style={styles.manualInputsGrid}>
+                    <View style={styles.manualInputItem}>
+                      <Text style={[styles.mInputLabel, { color: colors.textMuted }]}>
+                        Exp. Return (μ):
+                      </Text>
+                      <TextInput
+                        style={[styles.mInput, { color: colors.textPrimary, borderColor: colors.borderSubtle }]}
+                        value={(alloc.customReturn ?? defaultProfile.nominalReturnMean).toString()}
+                        onChangeText={(t) => handleUpdateCustomMetrics(idx, 'return', t)}
+                        keyboardType="decimal-pad"
+                      />
+                      <Text style={{ color: colors.textMuted, fontSize: 11 }}>%</Text>
+                    </View>
+
+                    <View style={styles.manualInputItem}>
+                      <Text style={[styles.mInputLabel, { color: colors.textMuted }]}>
+                        Volatility (σ):
+                      </Text>
+                      <TextInput
+                        style={[styles.mInput, { color: colors.textPrimary, borderColor: colors.borderSubtle }]}
+                        value={(alloc.customStdDev ?? defaultProfile.stdDev).toString()}
+                        onChangeText={(t) => handleUpdateCustomMetrics(idx, 'stdDev', t)}
+                        keyboardType="decimal-pad"
+                      />
+                      <Text style={{ color: colors.textMuted, fontSize: 11 }}>%</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.allocSummaryRow}>
+                    <Text style={[styles.allocStatText, { color: colors.textMuted }]}>
+                      Historical Empirical: ~{defaultProfile.nominalReturnMean}% μ • {defaultProfile.stdDev}% σ
+                    </Text>
+                  </View>
+                )}
               </View>
-            </View>
-          </View>
-        ) : null}
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -592,6 +685,7 @@ const styles = StyleSheet.create({
   },
   horizonHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
@@ -599,28 +693,60 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  horizonRow: {
+  infoBadge: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  horizonDropdownRow: {
+    flexDirection: 'row',
+    position: 'relative',
+    zIndex: 20,
   },
   fieldLabelSub: {
     fontSize: 11,
     fontWeight: '600',
     marginBottom: 6,
   },
-  horizonChips: {
+  dropdownTrigger: {
     flexDirection: 'row',
-    gap: 6,
-  },
-  horizonChip: {
-    flex: 1,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
   },
-  horizonChipText: {
-    fontSize: 12,
+  dropdownTriggerText: {
+    fontSize: 13,
     fontWeight: '700',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    borderRadius: 10,
+    borderWidth: 1,
+    zIndex: 999,
+    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  dropdownItemText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   foreignSection: {
     marginTop: 14,
@@ -630,103 +756,99 @@ const styles = StyleSheet.create({
   foreignHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  foreignPctLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  foreignDesc: {
-    fontSize: 11,
-    marginBottom: 8,
-  },
-  foreignControlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    marginBottom: 10,
     flexWrap: 'wrap',
     gap: 8,
   },
-  foreignCountrySelector: {
+  foreignDesc: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  addCountryRow: {
     flexDirection: 'row',
     gap: 6,
   },
-  secCountryChip: {
+  addChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 5,
+    paddingVertical: 4,
     paddingHorizontal: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  secCountryText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  foreignPctChips: {
-    flexDirection: 'row',
+    borderRadius: 6,
     gap: 4,
   },
-  pctChip: {
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  pctChipText: {
+  addChipText: {
     fontSize: 11,
     fontWeight: '700',
   },
-  roiSection: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
+  allocList: {
+    gap: 8,
   },
-  roiHeaderRow: {
+  allocCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+  },
+  allocCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  roiTitle: {
+  allocCountryName: {
     fontSize: 13,
     fontWeight: '700',
   },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  toggleLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  manualSlidersContainer: {
-    marginTop: 10,
-  },
-  sliderGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  roiPill: {
-    flex: 1,
+  weightBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  roiPillLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  roiPillInput: {
+  weightInput: {
     width: 44,
-    height: 34,
+    height: 32,
     borderWidth: 1,
     borderRadius: 6,
     textAlign: 'center',
     fontSize: 13,
+    fontWeight: '800',
+  },
+  manualIconBtn: {
+    padding: 6,
+    borderRadius: 6,
+  },
+  trashBtn: {
+    padding: 6,
+  },
+  manualInputsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  manualInputItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  mInputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  mInput: {
+    width: 48,
+    height: 28,
+    borderWidth: 1,
+    borderRadius: 6,
+    textAlign: 'center',
+    fontSize: 12,
     fontWeight: '700',
-    paddingVertical: 2,
+  },
+  allocSummaryRow: {
+    marginTop: 4,
+  },
+  allocStatText: {
+    fontSize: 10,
   },
 });

@@ -15,8 +15,6 @@ import {
   X,
   Check,
   ChevronDown,
-  ChevronsLeft,
-  ChevronsRight,
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 
@@ -55,13 +53,13 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
   const [viewMonth, setViewMonth] = useState(initialDate.getMonth()); // 0-11
   const [selectedDay, setSelectedDay] = useState(initialDate.getDate());
 
-  // Decade page for year picker
-  const [decadeStart, setDecadeStart] = useState(Math.floor(initialDate.getFullYear() / 12) * 12);
-
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
+
+  // Full year list from 1970 to 2085
+  const fullYearList = Array.from({ length: 116 }, (_, i) => 1970 + i);
 
   const handlePrevMonth = () => {
     if (viewMonth === 0) {
@@ -107,7 +105,6 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
     setViewYear(current.getFullYear());
     setViewMonth(current.getMonth());
     setSelectedDay(current.getDate());
-    setDecadeStart(Math.floor(current.getFullYear() / 12) * 12);
     setPickerMode('days');
     setModalVisible(true);
   };
@@ -143,7 +140,7 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Calendar & Fast Year Picker Modal */}
+      {/* Calendar Modal */}
       <Modal
         visible={modalVisible}
         transparent
@@ -166,15 +163,15 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
               <View>
                 <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
                   {pickerMode === 'years'
-                    ? 'Select Year'
+                    ? 'Select Year (1970–2085)'
                     : pickerMode === 'months'
                     ? 'Select Month'
                     : 'Select Start Date'}
                 </Text>
                 <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
                   {pickerMode === 'years'
-                    ? 'Jump directly across decades'
-                    : 'Simulation decumulation start'}
+                    ? 'Instant decade jump without scrolling'
+                    : 'Simulation start date'}
                 </Text>
               </View>
               <TouchableOpacity
@@ -196,7 +193,7 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
                     <ChevronLeft size={18} color={colors.textPrimary} />
                   </TouchableOpacity>
 
-                  {/* Direct Dropdown Buttons for Month and Year */}
+                  {/* Dropdown Chip Buttons */}
                   <View style={styles.selectorsRow}>
                     <TouchableOpacity
                       onPress={() => setPickerMode('months')}
@@ -209,10 +206,7 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      onPress={() => {
-                        setDecadeStart(Math.floor(viewYear / 12) * 12);
-                        setPickerMode('years');
-                      }}
+                      onPress={() => setPickerMode('years')}
                       style={[styles.dropdownChip, { backgroundColor: colors.surfaceElevated }]}
                     >
                       <Text style={[styles.dropdownChipText, { color: colors.textPrimary }]}>
@@ -229,70 +223,51 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
                     <ChevronRight size={18} color={colors.textPrimary} />
                   </TouchableOpacity>
                 </>
-              ) : pickerMode === 'years' ? (
-                <View style={styles.decadeNavRow}>
-                  <TouchableOpacity
-                    onPress={() => setDecadeStart(decadeStart - 12)}
-                    style={[styles.navArrow, { backgroundColor: colors.surfaceElevated }]}
-                  >
-                    <ChevronsLeft size={18} color={colors.textPrimary} />
-                  </TouchableOpacity>
-
-                  <Text style={[styles.decadeRangeText, { color: colors.textPrimary }]}>
-                    {decadeStart} – {decadeStart + 11}
-                  </Text>
-
-                  <TouchableOpacity
-                    onPress={() => setDecadeStart(decadeStart + 12)}
-                    style={[styles.navArrow, { backgroundColor: colors.surfaceElevated }]}
-                  >
-                    <ChevronsRight size={18} color={colors.textPrimary} />
-                  </TouchableOpacity>
-                </View>
               ) : (
                 <View style={styles.decadeNavRow}>
                   <Text style={[styles.decadeRangeText, { color: colors.textPrimary }]}>
-                    Choose Month ({viewYear})
+                    {pickerMode === 'years' ? `Choose Year (Currently: ${viewYear})` : 'Choose Month'}
                   </Text>
                 </View>
               )}
             </View>
 
-            {/* View Mode 1: Fast Year Selection Grid */}
+            {/* View Mode 1: Fast Year Selection List (1970–2085) */}
             {pickerMode === 'years' ? (
-              <View style={styles.gridContainer}>
-                {Array.from({ length: 12 }).map((_, idx) => {
-                  const yr = decadeStart + idx;
-                  const isSelected = yr === viewYear;
-                  return (
-                    <TouchableOpacity
-                      key={yr}
-                      onPress={() => {
-                        setViewYear(yr);
-                        setPickerMode('days');
-                      }}
-                      style={[
-                        styles.yearGridItem,
-                        {
-                          backgroundColor: isSelected ? colors.accent : colors.surfaceElevated,
-                          borderColor: isSelected ? colors.accent : colors.borderSubtle,
-                        },
-                      ]}
-                    >
-                      <Text
+              <ScrollView style={styles.yearScrollList} showsVerticalScrollIndicator={true}>
+                <View style={styles.yearGrid}>
+                  {fullYearList.map((yr) => {
+                    const isSelected = yr === viewYear;
+                    return (
+                      <TouchableOpacity
+                        key={yr}
+                        onPress={() => {
+                          setViewYear(yr);
+                          setPickerMode('days');
+                        }}
                         style={[
-                          styles.yearGridItemText,
-                          { color: isSelected ? '#FFFFFF' : colors.textPrimary },
+                          styles.yearGridItem,
+                          {
+                            backgroundColor: isSelected ? colors.accent : colors.surfaceElevated,
+                            borderColor: isSelected ? colors.accent : colors.borderSubtle,
+                          },
                         ]}
                       >
-                        {yr}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                        <Text
+                          style={[
+                            styles.yearGridItemText,
+                            { color: isSelected ? '#FFFFFF' : colors.textPrimary },
+                          ]}
+                        >
+                          {yr}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
             ) : pickerMode === 'months' ? (
-              /* View Mode 2: Fast Month Selection Grid */
+              /* View Mode 2: Month Grid */
               <View style={styles.gridContainer}>
                 {monthNames.map((mName, idx) => {
                   const isSelected = idx === viewMonth;
@@ -324,7 +299,7 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
                 })}
               </View>
             ) : (
-              /* View Mode 3: Standard Days Grid */
+              /* View Mode 3: Days Grid */
               <>
                 <View style={styles.weekdaysRow}>
                   {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((w, idx) => (
@@ -370,7 +345,7 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
               </>
             )}
 
-            {/* Quick Actions Footer */}
+            {/* Footer */}
             <View style={[styles.footerRow, { borderTopColor: colors.borderSubtle }]}>
               {pickerMode !== 'days' ? (
                 <TouchableOpacity
@@ -453,7 +428,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 390,
     borderRadius: 20,
     borderWidth: 1,
     padding: 20,
@@ -512,12 +487,33 @@ const styles = StyleSheet.create({
   },
   decadeNavRow: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
   decadeRangeText: {
-    fontSize: 15,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  yearScrollList: {
+    maxHeight: 250,
+  },
+  yearGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingVertical: 6,
+  },
+  yearGridItem: {
+    width: '23%',
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 3,
+  },
+  yearGridItemText: {
+    fontSize: 13,
     fontWeight: '700',
   },
   gridContainer: {
@@ -526,19 +522,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
     paddingVertical: 8,
-  },
-  yearGridItem: {
-    width: '30%',
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 4,
-  },
-  yearGridItemText: {
-    fontSize: 14,
-    fontWeight: '700',
   },
   monthGridItem: {
     width: '30%',

@@ -1,4 +1,4 @@
-import { COUNTRY_PROFILES, calculateBlendedBucket3 } from './historicalData';
+import { COUNTRY_PROFILES, calculateMultiAssetBlendedB3 } from './historicalData';
 import { SimulationInputs, YearSimulationResult } from './types';
 
 export function calculateInitialSplit(inputs: SimulationInputs) {
@@ -65,13 +65,13 @@ export function runDeterministicSimulation(
   const inflationDec = inputs.inflationRate / 100;
   const frictionRate = (inputs.rebalancingFrictionRate || 0.15) / 100;
 
-  const horizon = Math.max(10, Math.min(60, inputs.simulationHorizon || 30));
+  // Supports up to 80 years
+  const horizon = Math.max(10, Math.min(80, inputs.simulationHorizon || 30));
 
   const countryProfile = COUNTRY_PROFILES[inputs.baseCountry || 'IN'] || COUNTRY_PROFILES.IN;
-  const blendedB3 = calculateBlendedBucket3(
+  const blendedB3 = calculateMultiAssetBlendedB3(
     inputs.baseCountry || 'IN',
-    inputs.foreignCountry || 'US',
-    inputs.foreignAllocationPercent || 0
+    inputs.multiCountryAllocations
   );
 
   const results: YearSimulationResult[] = [];
@@ -80,7 +80,7 @@ export function runDeterministicSimulation(
   for (let year = 1; year <= horizon; year++) {
     const calendarYear = startYear + year - 1;
 
-    // Year t withdrawal indexed to inflation: W_t = W_0 * (1 + i)^(t - 1)
+    // Year t indexed expense: W_t = W_0 * (1 + inflation)^(t - 1)
     const withdrawalAmount = inputs.monthlyWithdrawal * 12 * Math.pow(1 + inflationDec, year - 1);
     const realPurchasingPower = Math.round(withdrawalAmount / Math.pow(1 + inflationDec, year - 1));
 
@@ -130,7 +130,7 @@ export function runDeterministicSimulation(
       b3 = 0;
     }
 
-    // Step 2: Growth during the year
+    // Step 2: Annual growth
     let r1 = 0;
     let r2 = 0;
     let r3 = 0;
@@ -176,12 +176,10 @@ export function runDeterministicSimulation(
     // Refill Bucket 2 from Bucket 3 if below target
     if (b2 < targetB2 && b3 > 0) {
       const deficit = targetB2 - b2;
-      // Sequence-of-Returns Protection:
-      // If equity market had a down year (r3 < 0), protect equities from distress selling!
       const isBearMarket = r3 < 0;
       if (isBearMarket && b2 > nextYearExpense * 1.5) {
         bearMarketDefenseActive = true;
-        // Do not sell equities at a loss; let Bucket 2 absorb the down year
+        // Bear Market Defense: Protect equities from distress liquidation
       } else {
         b2Refill = Math.min(b3, deficit);
         const friction = b2Refill * frictionRate;

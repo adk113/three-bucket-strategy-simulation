@@ -1,5 +1,13 @@
 import { SupportedCountry } from '../utils/currency';
 
+export interface CrossBorderEquityAllocation {
+  country: SupportedCountry;
+  weight: number; // percentage of Bucket 3 (e.g. 50%, 30%, 20%)
+  isManual: boolean;
+  customReturn?: number; // % p.a.
+  customStdDev?: number; // % p.a.
+}
+
 export interface SimulationInputs {
   initialCorpus: number;
   monthlyWithdrawal: number;
@@ -9,19 +17,18 @@ export interface SimulationInputs {
   bucket2Years: number; // default 7
   mode: 'historical' | 'manual';
 
-  // Multi-Country & Cross-Border Settings
+  // Base Market & Multi-Country Cross-Border Settings
   baseCountry: SupportedCountry; // 'IN' | 'US' | 'UK' | 'EU'
-  foreignCountry: SupportedCountry;
-  foreignAllocationPercent: number; // 0% to 50% of Bucket 3
+  multiCountryAllocations: CrossBorderEquityAllocation[];
 
-  // Variable Time Horizons
-  simulationHorizon: number; // e.g. 30 or 40 (years simulated in engine)
-  displayHorizon: number; // e.g. 10, 15, 20, 30 (years rendered on charts)
+  // Ultra-Long Variable Time Horizons (up to 80 years)
+  simulationHorizon: number; // 10 to 80 years
+  displayHorizon: number; // 10 to 80 years
 
   // Rebalancing Friction
   rebalancingFrictionRate: number; // e.g. 0.15% transaction friction
 
-  // Manual expected returns (%)
+  // Manual expected returns for baseline (%)
   manualReturns: {
     bucket1: number;
     bucket2: number;
@@ -58,7 +65,7 @@ export interface MonteCarloSummary {
   averageDepletionYear: number | null;
   depletionCount: number;
   totalRuns: number;
-  diversificationBenefitVolReduction: number; // e.g. -1.4% std dev
+  diversificationBenefitVolReduction: number;
 }
 
 export interface StrategyInsight {

@@ -20,7 +20,7 @@ import Svg, {
 import { useTheme } from '../../theme/ThemeContext';
 import { PALETTE } from '../../theme/colors';
 import { MonteCarloSummary, YearSimulationResult } from '../../engine/types';
-import { LineChart, Layers, ShieldCheck, ArrowRightLeft } from 'lucide-react-native';
+import { LineChart, Layers, ShieldCheck, ArrowRightLeft, HelpCircle } from 'lucide-react-native';
 import { SupportedCountry, formatCurrency, formatShortAxis } from '../../utils/currency';
 
 interface ProjectionChartProps {
@@ -28,6 +28,7 @@ interface ProjectionChartProps {
   mcSummary: MonteCarloSummary;
   displayHorizon: number;
   baseCountry: SupportedCountry;
+  onOpenEducationModal?: (topic: 'riskcone' | 'waterfall') => void;
 }
 
 export const ProjectionChart: React.FC<ProjectionChartProps> = ({
@@ -35,6 +36,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   mcSummary,
   displayHorizon = 30,
   baseCountry = 'IN',
+  onOpenEducationModal,
 }) => {
   const { colors } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
@@ -44,20 +46,19 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
     Math.min(displayHorizon - 1, 9)
   );
 
-  // Slice results according to user's customized Display Horizon
+  // Scalable slice up to 80 years
   const effectiveHorizon = Math.min(results.length, Math.max(5, displayHorizon));
   const displayedResults = results.slice(0, effectiveHorizon);
   const displayedMedian = mcSummary.medianTrajectory.slice(0, effectiveHorizon);
   const displayedP10 = mcSummary.p10Trajectory.slice(0, effectiveHorizon);
   const displayedP90 = mcSummary.p90Trajectory.slice(0, effectiveHorizon);
 
-  // Responsive chart width
-  const containerWidth = Math.min(windowWidth - 36, 850);
-  const chartHeight = 260;
-  const paddingLeft = 52;
+  const containerWidth = Math.min(windowWidth - 36, 880);
+  const chartHeight = 270;
+  const paddingLeft = 54;
   const paddingRight = 16;
-  const paddingTop = 20;
-  const paddingBottom = 32;
+  const paddingTop = 22;
+  const paddingBottom = 34;
 
   const innerWidth = containerWidth - paddingLeft - paddingRight;
   const innerHeight = chartHeight - paddingTop - paddingBottom;
@@ -112,7 +113,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
     return { b1Path, b2Path, b3Path };
   };
 
-  // Monte Carlo Paths
+  // Monte Carlo Paths (P10, P50, P90)
   const buildMCPaths = () => {
     let p90Line = '';
     let p50Line = '';
@@ -151,9 +152,17 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
 
   const selectedData = displayedResults[selectedYearIndex] || displayedResults[0];
 
-  // Dynamic X-axis tick generator based on display horizon
+  // Adaptive X-axis tick generator for horizons up to 80 years
   const generateXTicks = () => {
-    const step = effectiveHorizon <= 15 ? 2 : effectiveHorizon <= 25 ? 5 : 5;
+    const step =
+      effectiveHorizon <= 15
+        ? 2
+        : effectiveHorizon <= 30
+        ? 5
+        : effectiveHorizon <= 50
+        ? 10
+        : 10;
+
     const ticks: number[] = [1];
     for (let y = step; y < effectiveHorizon; y += step) {
       if (y !== 1 && y !== effectiveHorizon) ticks.push(y);
@@ -175,13 +184,21 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
     >
       <View style={styles.chartHeader}>
         <View>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>
-            Portfolio Trajectory ({effectiveHorizon} Years)
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>
+              Portfolio Trajectory ({effectiveHorizon} Years)
+            </Text>
+            <TouchableOpacity
+              onPress={() => onOpenEducationModal?.(activeTab === 'stacked' ? 'waterfall' : 'riskcone')}
+              style={styles.infoIconBtn}
+            >
+              <HelpCircle size={15} color={colors.accent} />
+            </TouchableOpacity>
+          </View>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             {activeTab === 'stacked'
               ? 'Multi-Bucket Waterfall Breakdown & Rebalancing'
-              : 'Monte Carlo Stochastic Risk Cone (P10 - P50 - P90)'}
+              : 'Monte Carlo Stochastic Risk Cone (P10 Bear - P50 Base - P90 Bull)'}
           </Text>
         </View>
 
@@ -315,6 +332,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             /* Layer 2: Monte Carlo Risk Cone */
             <G>
               <Path d={bandPath} fill="url(#mcConeGrad)" />
+              {/* Bull (P90) */}
               <Path
                 d={p90Line}
                 fill="none"
@@ -322,7 +340,9 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
                 strokeWidth="2"
                 strokeDasharray="4 2"
               />
+              {/* Median (P50) */}
               <Path d={p50Line} fill="none" stroke="#38BDF8" strokeWidth="2.5" />
+              {/* Bear (P10) */}
               <Path
                 d={p10Line}
                 fill="none"
@@ -355,7 +375,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
         </Svg>
       </View>
 
-      {/* Year Selector Chips */}
+      {/* Year Selector Chips (Subsampled on 50-80 yr horizons for clean navigation) */}
       <View style={styles.yearScrollContainer}>
         <Text style={[styles.inspectPrompt, { color: colors.textMuted }]}>
           Inspect Year Details (Up to {effectiveHorizon} Years):
@@ -503,6 +523,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.3,
+  },
+  infoIconBtn: {
+    padding: 4,
+    marginLeft: 6,
   },
   subtitle: {
     fontSize: 12,

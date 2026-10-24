@@ -54,11 +54,15 @@ export function generateStrategyInsights(
   }
 
   // 2. Cross-Border Diversification Advantage
-  if (inputs.foreignAllocationPercent > 0 && inputs.baseCountry !== inputs.foreignCountry) {
+  const foreignAllocs = (inputs.multiCountryAllocations || []).filter(
+    (a) => a.country !== inputs.baseCountry && a.weight > 0
+  );
+  if (foreignAllocs.length > 0) {
+    const summaryStr = foreignAllocs.map((a) => `${a.weight}% ${a.country}`).join(', ');
     insights.push({
       type: 'info',
-      title: `Cross-Border Diversification Active (${inputs.foreignAllocationPercent}% ${inputs.foreignCountry})`,
-      message: `Allocating ${inputs.foreignAllocationPercent}% of Bucket 3 to ${inputs.foreignCountry} assets reduced equity volatility drag by ~${mcSummary.diversificationBenefitVolReduction}% and provides geographic currency protection.`,
+      title: `Multi-Country Diversification Active (${summaryStr})`,
+      message: `Blending Bucket 3 equities across ${foreignAllocs.length} foreign markets reduced equity volatility drag by ~${mcSummary.diversificationBenefitVolReduction}% through low cross-country correlation and provides global purchasing power protection.`,
     });
   }
 

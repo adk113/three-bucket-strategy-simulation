@@ -14,7 +14,7 @@ import {
   Moon,
   FolderOpen,
   RotateCcw,
-  Globe2,
+  BookOpen,
 } from 'lucide-react-native';
 import { useTheme } from '../src/theme/ThemeContext';
 import { SimulationInputs } from '../src/engine/types';
@@ -28,6 +28,7 @@ import { ProjectionChart } from '../src/components/simulation/ProjectionChart';
 import { InsightsPanel } from '../src/components/simulation/InsightsPanel';
 import { StrategyModal } from '../src/components/simulation/StrategyModal';
 import { InstrumentModal } from '../src/components/simulation/InstrumentModal';
+import { FinancialGlossaryModal } from '../src/components/common/FinancialGlossaryModal';
 import { COUNTRY_METAS, SupportedCountry } from '../src/utils/currency';
 
 const DEFAULT_INPUTS: SimulationInputs = {
@@ -39,8 +40,10 @@ const DEFAULT_INPUTS: SimulationInputs = {
   bucket2Years: 7,
   mode: 'historical',
   baseCountry: 'IN',
-  foreignCountry: 'US',
-  foreignAllocationPercent: 0,
+  multiCountryAllocations: [
+    { country: 'IN', weight: 60, isManual: false },
+    { country: 'US', weight: 40, isManual: false },
+  ],
   simulationHorizon: 30,
   displayHorizon: 30,
   rebalancingFrictionRate: 0.15,
@@ -57,6 +60,8 @@ export default function SimulationDashboard() {
   const [inputs, setInputs] = useState<SimulationInputs>(DEFAULT_INPUTS);
   const [strategyModalVisible, setStrategyModalVisible] = useState(false);
   const [selectedBucketModal, setSelectedBucketModal] = useState<1 | 2 | 3 | null>(null);
+  const [glossaryModalVisible, setGlossaryModalVisible] = useState(false);
+  const [glossaryTopic, setGlossaryTopic] = useState<'riskcone' | 'buckets' | 'waterfall' | 'swr'>('riskcone');
 
   // Re-run simulation models whenever inputs change
   const split = useMemo(() => calculateInitialSplit(inputs), [inputs]);
@@ -79,7 +84,13 @@ export default function SimulationDashboard() {
     setInputs(DEFAULT_INPUTS);
   };
 
+  const openEducation = (topic: 'riskcone' | 'buckets' | 'waterfall' | 'swr' = 'riskcone') => {
+    setGlossaryTopic(topic);
+    setGlossaryModalVisible(true);
+  };
+
   const countryMeta = COUNTRY_METAS[inputs.baseCountry || 'IN'] || COUNTRY_METAS.IN;
+  const activeCountriesList = inputs.multiCountryAllocations.map((a) => a.country);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg }]}>
@@ -106,26 +117,38 @@ export default function SimulationDashboard() {
                 3-Bucket Strategy
               </Text>
               <View style={[styles.proBadge, { backgroundColor: colors.accent + '25' }]}>
-                <Text style={[styles.proBadgeText, { color: colors.accent }]}>GLOBAL V2</Text>
+                <Text style={[styles.proBadgeText, { color: colors.accent }]}>80Y PRO</Text>
               </View>
             </View>
             <Text style={[styles.brandSubtitle, { color: colors.textMuted }]}>
-              Multi-Market Retirement Wealth Preservation & Monte Carlo Model
+              Lifelong Multi-Market Wealth Preservation & Monte Carlo Model
             </Text>
           </View>
         </View>
 
         {/* Action Buttons */}
         <View style={styles.headerActions}>
+          {/* Education Glossary Button */}
+          <TouchableOpacity
+            style={[styles.headerBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle }]}
+            onPress={() => openEducation('riskcone')}
+            activeOpacity={0.7}
+          >
+            <BookOpen size={15} color={colors.accent} style={{ marginRight: 6 }} />
+            <Text style={[styles.headerBtnText, { color: colors.textPrimary }]}>
+              Glossary
+            </Text>
+          </TouchableOpacity>
+
           {/* Strategy Manager Modal Trigger */}
           <TouchableOpacity
             style={[styles.headerBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle }]}
             onPress={() => setStrategyModalVisible(true)}
             activeOpacity={0.7}
           >
-            <FolderOpen size={16} color={colors.accent} style={{ marginRight: 6 }} />
+            <FolderOpen size={15} color={colors.accent} style={{ marginRight: 6 }} />
             <Text style={[styles.headerBtnText, { color: colors.textPrimary }]}>
-              Saved ({`Profiles`})
+              Profiles
             </Text>
           </TouchableOpacity>
 
@@ -176,15 +199,11 @@ export default function SimulationDashboard() {
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                 <Text style={styles.countryFlagBadge}>{countryMeta.flag}</Text>
                 <Text style={[styles.heroHeading, { color: colors.textPrimary }]}>
-                  {countryMeta.name} Market Mode ({countryMeta.currencyCode})
+                  {countryMeta.name} Base ({countryMeta.currencyCode}) • {inputs.simulationHorizon}-Year Horizon
                 </Text>
               </View>
               <Text style={[styles.heroDescription, { color: colors.textSecondary }]}>
-                Bucket 1 secures living expenses for {inputs.bucket1Years} years without liquidation risks. Bucket 2 absorbs equity volatility, and Bucket 3 compounds wealth across a {inputs.simulationHorizon}-year horizon
-                {inputs.foreignAllocationPercent > 0
-                  ? ` with ${inputs.foreignAllocationPercent}% foreign diversification in ${inputs.foreignCountry}`
-                  : ''}
-                .
+                Bucket 1 secures living expenses for {inputs.bucket1Years} years without liquidation risks. Bucket 2 absorbs equity volatility, and Bucket 3 compounds wealth across {inputs.simulationHorizon} years with multi-country cross-border allocations.
               </Text>
             </View>
             <View style={styles.quickStatBox}>
@@ -202,11 +221,12 @@ export default function SimulationDashboard() {
             </View>
           </View>
 
-          {/* 1. Input Section with Country Selector, Horizons & Foreign Allocation */}
+          {/* 1. Input Section with 80-Year Horizons, Country Blends & Manual Overrides */}
           <InputSection
             inputs={inputs}
             onChangeInputs={setInputs}
             onSuggestSafeWithdrawal={handleSuggestSafeWithdrawal}
+            onOpenEducationModal={() => openEducation('swr')}
           />
 
           {/* 2. Live 3-Bucket Allocation Split Cards */}
@@ -219,12 +239,13 @@ export default function SimulationDashboard() {
             onSelectBucket={(bNum) => setSelectedBucketModal(bNum)}
           />
 
-          {/* 3. Trajectory Chart (Scales to Display Horizon) */}
+          {/* 3. Trajectory Chart (Scalable to 80 Years) */}
           <ProjectionChart
             results={simResults}
             mcSummary={mcSummary}
             displayHorizon={inputs.displayHorizon || 30}
             baseCountry={inputs.baseCountry}
+            onOpenEducationModal={(topic) => openEducation(topic)}
           />
 
           {/* 4. Actuarial Insights & Depletion Warning Panel */}
@@ -238,7 +259,7 @@ export default function SimulationDashboard() {
           {/* Footer Notes */}
           <View style={styles.footerNote}>
             <Text style={[styles.footerText, { color: colors.textMuted }]}>
-              3-Bucket Strategy Simulation • Universal Cross-Border Engine (US, India, UK, Eurozone) • Offline Storage & Actuarial Monte Carlo Modelling.
+              3-Bucket Strategy Simulation • Institutional Multi-Asset Engine (Up to 80-Year Longevity) • Offline Storage & Actuarial Monte Carlo Modelling.
             </Text>
           </View>
         </View>
@@ -252,11 +273,19 @@ export default function SimulationDashboard() {
         onLoadStrategy={(newInputs) => setInputs(newInputs)}
       />
 
-      {/* Instrument Recommendations Modal */}
+      {/* Instrument Recommendations Modal (Multi-Market) */}
       <InstrumentModal
         bucketNum={selectedBucketModal}
         baseCountry={inputs.baseCountry}
+        activeCountries={activeCountriesList}
         onClose={() => setSelectedBucketModal(null)}
+      />
+
+      {/* Financial Education & Glossary Modal */}
+      <FinancialGlossaryModal
+        visible={glossaryModalVisible}
+        initialTopic={glossaryTopic}
+        onClose={() => setGlossaryModalVisible(false)}
       />
     </SafeAreaView>
   );

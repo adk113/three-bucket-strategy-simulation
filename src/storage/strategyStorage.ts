@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SavedStrategy, SimulationInputs } from '../engine/types';
 
-const STORAGE_KEY = '@three_bucket_saved_strategies_v2';
+const STORAGE_KEY = '@three_bucket_saved_strategies_v3';
 
 export const DEFAULT_PRESETS: SavedStrategy[] = [
   {
@@ -17,8 +17,10 @@ export const DEFAULT_PRESETS: SavedStrategy[] = [
       bucket2Years: 7,
       mode: 'historical',
       baseCountry: 'IN',
-      foreignCountry: 'US',
-      foreignAllocationPercent: 25,
+      multiCountryAllocations: [
+        { country: 'IN', weight: 60, isManual: false },
+        { country: 'US', weight: 40, isManual: false },
+      ],
       simulationHorizon: 30,
       displayHorizon: 30,
       rebalancingFrictionRate: 0.15,
@@ -38,8 +40,10 @@ export const DEFAULT_PRESETS: SavedStrategy[] = [
       bucket2Years: 6,
       mode: 'historical',
       baseCountry: 'US',
-      foreignCountry: 'IN',
-      foreignAllocationPercent: 15,
+      multiCountryAllocations: [
+        { country: 'US', weight: 70, isManual: false },
+        { country: 'EU', weight: 30, isManual: false },
+      ],
       simulationHorizon: 40,
       displayHorizon: 30,
       rebalancingFrictionRate: 0.10,
@@ -48,7 +52,7 @@ export const DEFAULT_PRESETS: SavedStrategy[] = [
   },
   {
     id: 'preset_conservative_retiree',
-    name: 'Conservative Capital Preservation (India ₹1.5 Cr)',
+    name: 'Conservative 50Y Lifelong Preservation (India ₹1.5 Cr)',
     createdAt: '2026-01-01T00:00:00.000Z',
     inputs: {
       initialCorpus: 15000000,
@@ -59,10 +63,12 @@ export const DEFAULT_PRESETS: SavedStrategy[] = [
       bucket2Years: 8,
       mode: 'historical',
       baseCountry: 'IN',
-      foreignCountry: 'US',
-      foreignAllocationPercent: 0,
-      simulationHorizon: 30,
-      displayHorizon: 20,
+      multiCountryAllocations: [
+        { country: 'IN', weight: 80, isManual: false },
+        { country: 'US', weight: 20, isManual: false },
+      ],
+      simulationHorizon: 50,
+      displayHorizon: 30,
       rebalancingFrictionRate: 0.15,
       manualReturns: { bucket1: 5.5, bucket2: 7.5, bucket3: 11.0 },
     },
