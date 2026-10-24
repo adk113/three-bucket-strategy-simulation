@@ -54,41 +54,53 @@ export const COUNTRY_METAS: Record<SupportedCountry, CountryMeta> = {
   },
 };
 
-export function formatCurrency(amount: number, country: SupportedCountry = 'IN'): string {
+export function formatCurrency(amount: number | undefined | null, country: SupportedCountry = 'IN'): string {
   const meta = COUNTRY_METAS[country] || COUNTRY_METAS.IN;
   const sym = meta.currencySymbol;
 
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return `${sym}0`;
+  }
+
+  const safeAmount = Math.max(0, amount);
+
   if (country === 'IN') {
-    if (amount >= 10000000) {
-      return `${sym}${(amount / 10000000).toFixed(2)} Cr`;
+    if (safeAmount >= 10000000) {
+      return `${sym}${(safeAmount / 10000000).toFixed(2)} Cr`;
     }
-    if (amount >= 100000) {
-      return `${sym}${(amount / 100000).toFixed(2)} L`;
+    if (safeAmount >= 100000) {
+      return `${sym}${(safeAmount / 100000).toFixed(2)} L`;
     }
-    return `${sym}${Math.round(amount).toLocaleString('en-IN')}`;
+    return `${sym}${Math.round(safeAmount).toLocaleString('en-IN')}`;
   }
 
   // Western currencies (USD, GBP, EUR)
-  if (amount >= 1000000) {
-    return `${sym}${(amount / 1000000).toFixed(2)}M`;
+  if (safeAmount >= 1000000) {
+    return `${sym}${(safeAmount / 1000000).toFixed(2)}M`;
   }
-  if (amount >= 1000) {
-    return `${sym}${(amount / 1000).toFixed(1)}k`;
+  if (safeAmount >= 1000) {
+    return `${sym}${(safeAmount / 1000).toFixed(1)}k`;
   }
-  return `${sym}${Math.round(amount).toLocaleString()}`;
+  return `${sym}${Math.round(safeAmount).toLocaleString()}`;
 }
 
-export function formatShortAxis(amount: number, country: SupportedCountry = 'IN'): string {
+export function formatShortAxis(amount: number | undefined | null, country: SupportedCountry = 'IN'): string {
   const meta = COUNTRY_METAS[country] || COUNTRY_METAS.IN;
   const sym = meta.currencySymbol;
 
-  if (country === 'IN') {
-    if (amount >= 10000000) return `${sym}${(amount / 10000000).toFixed(1)}Cr`;
-    if (amount >= 100000) return `${sym}${(amount / 100000).toFixed(0)}L`;
-    return `${sym}${Math.round(amount / 1000)}k`;
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return `${sym}0`;
   }
 
-  if (amount >= 1000000) return `${sym}${(amount / 1000000).toFixed(1)}M`;
-  if (amount >= 1000) return `${sym}${(amount / 1000).toFixed(0)}k`;
-  return `${sym}${Math.round(amount)}`;
+  const safeAmount = Math.max(0, amount);
+
+  if (country === 'IN') {
+    if (safeAmount >= 10000000) return `${sym}${(safeAmount / 10000000).toFixed(1)}Cr`;
+    if (safeAmount >= 100000) return `${sym}${(safeAmount / 100000).toFixed(0)}L`;
+    return `${sym}${Math.round(safeAmount / 1000)}k`;
+  }
+
+  if (safeAmount >= 1000000) return `${sym}${(safeAmount / 1000000).toFixed(1)}M`;
+  if (safeAmount >= 1000) return `${sym}${(safeAmount / 1000).toFixed(0)}k`;
+  return `${sym}${Math.round(safeAmount)}`;
 }
