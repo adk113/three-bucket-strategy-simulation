@@ -2,21 +2,33 @@
   "expo": {
     "name": "3-Bucket Strategy Simulation",
     "slug": "three-bucket-strategy-simulation",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "scheme": "threebucket",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.threebucketstrategy"
+      "bundleIdentifier": "com.anonymous.threebucketstrategy",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera for verification and document scanning.",
+        "NSFaceIDUsageDescription": "Allow $(PRODUCT_NAME) to use Face ID for biometric authentication."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0B0F19",
         "foregroundImage": "./assets/icon.png"
       },
-      "package": "com.anonymous.threebucketstrategy"
+      "package": "com.anonymous.threebucketstrategy",
+      "versionCode": 2,
+      "permissions": [
+        "CAMERA",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -25,7 +37,26 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera for document scanning."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID for biometric authentication."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0284C7"
+        }
+      ]
     ],
     "updates": {
       "url": "https://u.expo.dev/dd902338-e397-4b69-8268-c12afdd38f6a"
