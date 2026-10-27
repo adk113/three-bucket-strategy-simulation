@@ -303,7 +303,7 @@ export default function SimulationDashboard() {
               contentContainerStyle={styles.landscapeRightScroll}
               showsVerticalScrollIndicator={false}
             >
-              {/* Top Quick Status & Secondary Export Trigger */}
+              {/* Top Quick Status */}
               <View style={styles.landscapeRightHeaderRow}>
                 <View style={styles.quickStatBox}>
                   <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>
@@ -318,24 +318,6 @@ export default function SimulationDashboard() {
                     {mcSummary.successRate}%
                   </Text>
                 </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.exportBannerBtn,
-                    {
-                      backgroundColor: '#10B98115',
-                      borderColor: '#10B98150',
-                    },
-                  ]}
-                  onPress={handleExportData}
-                  activeOpacity={0.7}
-                  disabled={isExporting}
-                >
-                  <FileSpreadsheet size={16} color="#10B981" style={{ marginRight: 6 }} />
-                  <Text style={[styles.exportBannerBtnText, { color: '#10B981' }]}>
-                    Export Calculation Breakdown (CSV)
-                  </Text>
-                </TouchableOpacity>
               </View>
 
               {/* 2. Live 3-Bucket Split Cards */}
@@ -449,26 +431,7 @@ export default function SimulationDashboard() {
               onOpenEducationModal={(topic) => openEducation(topic)}
             />
 
-            {/* Export Breakdown Trigger Banner */}
-            <TouchableOpacity
-              style={[
-                styles.exportBannerBtn,
-                {
-                  backgroundColor: '#10B98115',
-                  borderColor: '#10B98150',
-                  marginTop: 4,
-                  marginBottom: 12,
-                },
-              ]}
-              onPress={handleExportData}
-              activeOpacity={0.7}
-              disabled={isExporting}
-            >
-              <FileSpreadsheet size={17} color="#10B981" style={{ marginRight: 8 }} />
-              <Text style={[styles.exportBannerBtnText, { color: '#10B981' }]}>
-                {isExporting ? 'Generating Report...' : 'Export Complete Calculation Breakdown (CSV / Excel)'}
-              </Text>
-            </TouchableOpacity>
+
 
             {/* 4. Actuarial Insights & Depletion Warning Panel */}
             <InsightsPanel

@@ -60,8 +60,17 @@ export const InputSection: React.FC<InputSectionProps> = ({
   const country = inputs.baseCountry || 'IN';
   const meta = COUNTRY_METAS[country] || COUNTRY_METAS.IN;
 
-  // Modal picker for horizons to completely eliminate z-index overlap bugs
-  const [horizonModalMode, setHorizonModalMode] = useState<'sim' | 'disp' | null>(null);
+  // Unified Horizon picker state (Simulate + Visualize in lockstep)
+  const [isHorizonModalOpen, setIsHorizonModalOpen] = useState(false);
+
+  const handleSelectUnifiedHorizon = (years: number) => {
+    onChangeInputs({
+      ...inputs,
+      simulationHorizon: years,
+      displayHorizon: years,
+    });
+    setIsHorizonModalOpen(false);
+  };
 
   const handleCorpusChange = (text: string) => {
     const clean = text.replace(/[^0-9]/g, '');
@@ -407,65 +416,64 @@ export const InputSection: React.FC<InputSectionProps> = ({
       </View>
 
       {/* 4. Ultra-Long Time Horizons (Modal Trigger Buttons — Zero Overlap) */}
+      {/* 4. Unified Retirement Planning Horizon (Up to 80 Years) */}
       <View style={[styles.horizonSection, { borderTopColor: colors.borderSubtle }]}>
         <View style={styles.horizonHeader}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <CalendarDays size={16} color={colors.accent} style={{ marginRight: 6 }} />
-            <Text style={[styles.subSectionTitle, { color: colors.textPrimary }]}>
-              Time Horizons (Up to 80 Years)
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <CalendarDays size={16} color={colors.accent} style={{ marginRight: 6 }} />
+              <Text style={[styles.subSectionTitle, { color: colors.textPrimary }]}>
+                Retirement Planning Horizon
+              </Text>
+            </View>
+            <Text style={[styles.foreignDesc, { color: colors.textMuted }]}>
+              Simulates portfolio survival and charts all {inputs.simulationHorizon || 50} years in lockstep.
             </Text>
           </View>
 
           <TouchableOpacity
-            onPress={onOpenEducationModal}
-            style={styles.infoBadge}
+            onPress={() => setIsHorizonModalOpen(true)}
+            style={[
+              styles.dropdownTrigger,
+              { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle, minWidth: 110 },
+            ]}
             activeOpacity={0.7}
           >
-            <HelpCircle size={14} color={colors.accent} style={{ marginRight: 4 }} />
-            <Text style={[styles.infoBadgeText, { color: colors.accent }]}>Methodology</Text>
+            <Text style={[styles.dropdownTriggerText, { color: colors.textPrimary }]}>
+              {inputs.simulationHorizon || 50} Years
+            </Text>
+            <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13, marginLeft: 6 }}>▾</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.horizonButtonsRow}>
-          {/* Simulation Horizon Trigger */}
-          <View style={{ flex: 1, marginRight: 8 }}>
-            <Text style={[styles.fieldLabelSub, { color: colors.textSecondary }]}>
-              Simulate Backend:
-            </Text>
-            <TouchableOpacity
-              onPress={() => setHorizonModalMode('sim')}
-              style={[
-                styles.dropdownTrigger,
-                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
-              ]}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.dropdownTriggerText, { color: colors.textPrimary }]}>
-                {inputs.simulationHorizon || 30} Years
-              </Text>
-              <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>▾</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Display Horizon Trigger */}
-          <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={[styles.fieldLabelSub, { color: colors.textSecondary }]}>
-              Visualize on Charts:
-            </Text>
-            <TouchableOpacity
-              onPress={() => setHorizonModalMode('disp')}
-              style={[
-                styles.dropdownTrigger,
-                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
-              ]}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.dropdownTriggerText, { color: colors.textPrimary }]}>
-                {inputs.displayHorizon || 30} Years
-              </Text>
-              <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>▾</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Quick Horizon Selectors: 20Y, 30Y, 40Y, 50Y, 60Y, 80Y */}
+        <View style={styles.horizonChipsRow}>
+          {[20, 30, 40, 50, 60, 80].map((h) => {
+            const isSelected = (inputs.simulationHorizon || 50) === h;
+            return (
+              <TouchableOpacity
+                key={h}
+                onPress={() => handleSelectUnifiedHorizon(h)}
+                style={[
+                  styles.horizonChip,
+                  {
+                    backgroundColor: isSelected ? colors.accent : colors.surfaceElevated,
+                    borderColor: isSelected ? colors.accent : colors.borderSubtle,
+                  },
+                ]}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.horizonChipText,
+                    { color: isSelected ? '#FFFFFF' : colors.textPrimary },
+                  ]}
+                >
+                  {h}Y
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
@@ -795,12 +803,12 @@ export const InputSection: React.FC<InputSectionProps> = ({
         </View>
       </View>
 
-      {/* Dedicated Horizon Selection Modal (Completely Eliminates Z-Index / Overlap Issues) */}
+      {/* Unified Horizon Selection Modal */}
       <Modal
-        visible={horizonModalMode !== null}
+        visible={isHorizonModalOpen}
         transparent
         animationType="fade"
-        onRequestClose={() => setHorizonModalMode(null)}
+        onRequestClose={() => setIsHorizonModalOpen(false)}
       >
         <View style={styles.modalOverlay}>
           <View
@@ -816,49 +824,28 @@ export const InputSection: React.FC<InputSectionProps> = ({
             <View style={styles.modalHeader}>
               <View>
                 <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
-                  {horizonModalMode === 'sim'
-                    ? 'Select Simulation Horizon'
-                    : 'Select Display Horizon'}
+                  Select Retirement Horizon
                 </Text>
                 <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
-                  {horizonModalMode === 'sim'
-                    ? 'How many years the engine calculates behind the scenes (up to 80 years)'
-                    : 'How many years are visualized on the charts'}
+                  Sets both backend calculations and chart visualizations in unified lockstep (up to 80 years)
                 </Text>
               </View>
               <TouchableOpacity
-                onPress={() => setHorizonModalMode(null)}
+                onPress={() => setIsHorizonModalOpen(false)}
                 style={[styles.closeBtn, { backgroundColor: colors.surfaceElevated }]}
               >
                 <X size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
-              {HORIZON_OPTIONS.filter((opt) =>
-                horizonModalMode === 'disp' ? opt.value <= (inputs.simulationHorizon || 30) : true
-              ).map((opt) => {
-                const currentVal =
-                  horizonModalMode === 'sim'
-                    ? inputs.simulationHorizon || 30
-                    : inputs.displayHorizon || 30;
-                const isSelected = currentVal === opt.value;
+            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+              {HORIZON_OPTIONS.map((opt) => {
+                const isSelected = (inputs.simulationHorizon || 50) === opt.value;
 
                 return (
                   <TouchableOpacity
                     key={opt.value}
-                    onPress={() => {
-                      if (horizonModalMode === 'sim') {
-                        onChangeInputs({
-                          ...inputs,
-                          simulationHorizon: opt.value,
-                          displayHorizon: Math.min(inputs.displayHorizon || 30, opt.value),
-                        });
-                      } else {
-                        onChangeInputs({ ...inputs, displayHorizon: opt.value });
-                      }
-                      setHorizonModalMode(null);
-                    }}
+                    onPress={() => handleSelectUnifiedHorizon(opt.value)}
                     style={[
                       styles.horizonOptionItem,
                       {
@@ -887,7 +874,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
             </ScrollView>
 
             <TouchableOpacity
-              onPress={() => setHorizonModalMode(null)}
+              onPress={() => setIsHorizonModalOpen(false)}
               style={[styles.modalCancelBtn, { backgroundColor: colors.surfaceElevated }]}
             >
               <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Close</Text>
@@ -1040,6 +1027,22 @@ const styles = StyleSheet.create({
   },
   dropdownTriggerText: {
     fontSize: 13,
+    fontWeight: '700',
+  },
+  horizonChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  horizonChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  horizonChipText: {
+    fontSize: 12,
     fontWeight: '700',
   },
   foreignSection: {

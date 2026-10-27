@@ -44,12 +44,15 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const { width: windowWidth } = useWindowDimensions();
 
   const [activeTab, setActiveTab] = useState<'stacked' | 'montecarlo'>('stacked');
+  const [zoomHorizon, setZoomHorizon] = useState<number | null>(null);
   const [selectedYearIndex, setSelectedYearIndex] = useState<number>(
     Math.min(displayHorizon - 1, 9)
   );
 
-  // Scalable slice up to 80 years
-  const effectiveHorizon = Math.min(results.length, Math.max(5, displayHorizon));
+  // Scalable slice up to 80 years (with optional early-retirement zoom lens)
+  const activeDisplayHorizon = zoomHorizon && zoomHorizon < displayHorizon ? zoomHorizon : displayHorizon;
+  const effectiveHorizon = Math.min(results.length, Math.max(5, activeDisplayHorizon));
+  const safeYearIndex = Math.min(selectedYearIndex, effectiveHorizon - 1);
   const displayedResults = results.slice(0, effectiveHorizon);
   const displayedMedian = mcSummary.medianTrajectory.slice(0, effectiveHorizon);
   const displayedP10 = mcSummary.p10Trajectory.slice(0, effectiveHorizon);
@@ -152,7 +155,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const { b1Path, b2Path, b3Path } = buildStackedAreaPaths();
   const { p90Line, p50Line, p10Line, bandPath } = buildMCPaths();
 
-  const selectedData = displayedResults[selectedYearIndex] || displayedResults[0];
+  const selectedData = displayedResults[safeYearIndex] || displayedResults[0];
 
   // Adaptive X-axis tick generator for horizons up to 80 years
   const generateXTicks = () => {
@@ -204,44 +207,107 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
           </Text>
         </View>
 
-        <View style={[styles.tabToggle, { backgroundColor: colors.surfaceElevated }]}>
-          <TouchableOpacity
-            onPress={() => setActiveTab('stacked')}
-            style={[styles.tabBtn, activeTab === 'stacked' && { backgroundColor: colors.accent }]}
-          >
-            <Layers
-              size={14}
-              color={activeTab === 'stacked' ? '#FFFFFF' : colors.textSecondary}
-              style={{ marginRight: 4 }}
-            />
-            <Text
-              style={[
-                styles.tabBtnText,
-                { color: activeTab === 'stacked' ? '#FFFFFF' : colors.textSecondary },
-              ]}
-            >
-              Buckets
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.chartHeaderRight}>
+          {/* Optional Quick Zoom Lens if displayHorizon > 30 */}
+          {displayHorizon > 30 ? (
+            <View style={[styles.zoomToggle, { backgroundColor: colors.surfaceElevated }]}>
+              <TouchableOpacity
+                onPress={() => setZoomHorizon(null)}
+                style={[
+                  styles.zoomBtn,
+                  (zoomHorizon === null || zoomHorizon >= displayHorizon) && {
+                    backgroundColor: colors.accent,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.zoomBtnText,
+                    {
+                      color:
+                        zoomHorizon === null || zoomHorizon >= displayHorizon
+                          ? '#FFFFFF'
+                          : colors.textSecondary,
+                    },
+                  ]}
+                >
+                  All ({displayHorizon}Y)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setZoomHorizon(30)}
+                style={[
+                  styles.zoomBtn,
+                  zoomHorizon === 30 && { backgroundColor: colors.accent },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.zoomBtnText,
+                    { color: zoomHorizon === 30 ? '#FFFFFF' : colors.textSecondary },
+                  ]}
+                >
+                  30Y
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setZoomHorizon(15)}
+                style={[
+                  styles.zoomBtn,
+                  zoomHorizon === 15 && { backgroundColor: colors.accent },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.zoomBtnText,
+                    { color: zoomHorizon === 15 ? '#FFFFFF' : colors.textSecondary },
+                  ]}
+                >
+                  15Y
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
-          <TouchableOpacity
-            onPress={() => setActiveTab('montecarlo')}
-            style={[styles.tabBtn, activeTab === 'montecarlo' && { backgroundColor: colors.accent }]}
-          >
-            <LineChart
-              size={14}
-              color={activeTab === 'montecarlo' ? '#FFFFFF' : colors.textSecondary}
-              style={{ marginRight: 4 }}
-            />
-            <Text
-              style={[
-                styles.tabBtnText,
-                { color: activeTab === 'montecarlo' ? '#FFFFFF' : colors.textSecondary },
-              ]}
+          <View style={[styles.tabToggle, { backgroundColor: colors.surfaceElevated }]}>
+            <TouchableOpacity
+              onPress={() => setActiveTab('stacked')}
+              style={[styles.tabBtn, activeTab === 'stacked' && { backgroundColor: colors.accent }]}
             >
-              Risk Cone
-            </Text>
-          </TouchableOpacity>
+              <Layers
+                size={14}
+                color={activeTab === 'stacked' ? '#FFFFFF' : colors.textSecondary}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.tabBtnText,
+                  { color: activeTab === 'stacked' ? '#FFFFFF' : colors.textSecondary },
+                ]}
+              >
+                Buckets
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setActiveTab('montecarlo')}
+              style={[styles.tabBtn, activeTab === 'montecarlo' && { backgroundColor: colors.accent }]}
+            >
+              <LineChart
+                size={14}
+                color={activeTab === 'montecarlo' ? '#FFFFFF' : colors.textSecondary}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.tabBtnText,
+                  { color: activeTab === 'montecarlo' ? '#FFFFFF' : colors.textSecondary },
+                ]}
+              >
+                Risk Cone
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -357,9 +423,9 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
 
           {/* Vertical cursor */}
           <Line
-            x1={scaleX(selectedYearIndex)}
+            x1={scaleX(safeYearIndex)}
             y1={paddingTop}
-            x2={scaleX(selectedYearIndex)}
+            x2={scaleX(safeYearIndex)}
             y2={paddingTop + innerHeight}
             stroke={colors.accent}
             strokeWidth="1.5"
@@ -367,7 +433,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
           />
 
           <Circle
-            cx={scaleX(selectedYearIndex)}
+            cx={scaleX(safeYearIndex)}
             cy={scaleY(selectedData.totalCorpus)}
             r="4.5"
             fill={colors.accent}
@@ -384,7 +450,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.yearScroll}>
           {displayedResults.map((r, idx) => {
-            const isSelected = idx === selectedYearIndex;
+            const isSelected = idx === safeYearIndex;
             return (
               <TouchableOpacity
                 key={r.year}
@@ -533,6 +599,28 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 12,
     marginTop: 2,
+  },
+  chartHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  zoomToggle: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  zoomBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  zoomBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   tabToggle: {
     flexDirection: 'row',
