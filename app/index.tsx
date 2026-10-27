@@ -17,6 +17,7 @@ import {
   FolderOpen,
   RotateCcw,
   BookOpen,
+  HelpCircle,
   FileSpreadsheet,
   CheckCircle2,
 } from 'lucide-react-native';
@@ -41,6 +42,7 @@ import { InsightsPanel } from '../src/components/simulation/InsightsPanel';
 import { StrategyModal } from '../src/components/simulation/StrategyModal';
 import { InstrumentModal } from '../src/components/simulation/InstrumentModal';
 import { FinancialGlossaryModal } from '../src/components/common/FinancialGlossaryModal';
+import { UserManualModal } from '../src/components/manual/UserManualModal';
 import { COUNTRY_METAS } from '../src/utils/currency';
 import { exportSimulationBreakdown } from '../src/utils/exportEngine';
 
@@ -99,6 +101,7 @@ export default function SimulationDashboard() {
   const [glossaryTopic, setGlossaryTopic] = useState<
     'riskcone' | 'buckets' | 'waterfall' | 'swr' | 'methodologies'
   >('riskcone');
+  const [manualModalVisible, setManualModalVisible] = useState(false);
 
   // Export engine state
   const [isExporting, setIsExporting] = useState(false);
@@ -350,6 +353,24 @@ export default function SimulationDashboard() {
               <Moon size={17} color="#6366F1" />
             )}
           </TouchableOpacity>
+
+          {/* In-App User Manual "?" Button */}
+          <TouchableOpacity
+            style={[
+              styles.iconOnlyBtn,
+              {
+                backgroundColor: colors.accent + '20',
+                borderColor: colors.accent + '55',
+                width: 36,
+                height: 36,
+              },
+            ]}
+            onPress={() => setManualModalVisible(true)}
+            activeOpacity={0.7}
+            accessibilityLabel="Open In-App User Manual"
+          >
+            <HelpCircle size={18} color={colors.accent} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -545,6 +566,19 @@ export default function SimulationDashboard() {
                 💡 Strategy Insights
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setManualModalVisible(true)}
+              style={[
+                styles.phoneLandscapeTabBtn,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.phoneLandscapeTabText, { color: colors.textSecondary }]}>
+                📖 User Manual
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={styles.phoneLandscapeScroll} showsVerticalScrollIndicator={false}>
@@ -735,6 +769,12 @@ export default function SimulationDashboard() {
         visible={glossaryModalVisible}
         initialTopic={glossaryTopic}
         onClose={() => setGlossaryModalVisible(false)}
+      />
+
+      {/* In-App Interactive User Manual Modal */}
+      <UserManualModal
+        visible={manualModalVisible}
+        onClose={() => setManualModalVisible(false)}
       />
     </SafeAreaView>
   );
