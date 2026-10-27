@@ -572,7 +572,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
                 ]}
               >
                 <View style={styles.allocCardTop}>
-                  <View>
+                  <View style={styles.allocCountryInfo}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={{ fontSize: 16, marginRight: 6 }}>{cMeta.flag}</Text>
                       <Text style={[styles.allocCountryName, { color: colors.textPrimary }]}>
@@ -584,19 +584,25 @@ export const InputSection: React.FC<InputSectionProps> = ({
                     </Text>
                   </View>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    {/* Weight Input */}
-                    <View style={styles.weightBox}>
+                  <View style={styles.allocControlsRow}>
+                    {/* Weight Input Box with integrated % unit label */}
+                    <View
+                      style={[
+                        styles.weightBox,
+                        { borderColor: colors.borderSubtle, backgroundColor: colors.inputBg },
+                      ]}
+                    >
                       <TextInput
                         style={[
                           styles.weightInput,
-                          { color: colors.textPrimary, borderColor: colors.borderSubtle },
+                          { color: colors.textPrimary },
                         ]}
                         value={alloc.weight.toString()}
                         onChangeText={(txt) => handleUpdateWeight(idx, txt)}
                         keyboardType="number-pad"
+                        selectTextOnFocus
                       />
-                      <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 11 }}>
+                      <Text style={[styles.weightUnitText, { color: colors.accent }]}>
                         %
                       </Text>
                     </View>
@@ -606,11 +612,13 @@ export const InputSection: React.FC<InputSectionProps> = ({
                       onPress={() => handleToggleManualCountry(idx, !alloc.isManual)}
                       style={[
                         styles.manualIconBtn,
-                        alloc.isManual && { backgroundColor: PALETTE.bucket3.base },
+                        { borderColor: colors.borderSubtle, backgroundColor: colors.surface },
+                        alloc.isManual && { backgroundColor: PALETTE.bucket3.base, borderColor: PALETTE.bucket3.base },
                       ]}
+                      activeOpacity={0.7}
                     >
                       <Settings2
-                        size={14}
+                        size={15}
                         color={alloc.isManual ? '#FFFFFF' : colors.textSecondary}
                       />
                     </TouchableOpacity>
@@ -619,8 +627,9 @@ export const InputSection: React.FC<InputSectionProps> = ({
                       <TouchableOpacity
                         onPress={() => handleRemoveCountry(idx)}
                         style={styles.trashBtn}
+                        activeOpacity={0.7}
                       >
-                        <Trash2 size={14} color="#EF4444" />
+                        <Trash2 size={15} color="#EF4444" />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -989,31 +998,60 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    minHeight: 44,
+  },
+  allocCountryInfo: {
+    flex: 1,
+    minWidth: 150,
   },
   allocCountryName: {
     fontSize: 13,
     fontWeight: '700',
   },
+  allocControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   weightBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minHeight: 36,
   },
   weightInput: {
     width: 44,
-    height: 32,
-    borderWidth: 1,
-    borderRadius: 6,
+    height: 34,
     textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '800',
+    padding: 0,
+  },
+  weightUnitText: {
     fontSize: 13,
     fontWeight: '800',
   },
   manualIconBtn: {
-    padding: 6,
-    borderRadius: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   trashBtn: {
-    padding: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
   },
   manualInputsGrid: {
     flexDirection: 'row',

@@ -3,15 +3,10 @@
     "name": "3-Bucket Strategy Simulation",
     "slug": "three-bucket-strategy-simulation",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "scheme": "threebucket",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0B0F19"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.threebucketstrategy"
@@ -29,7 +24,8 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-sharing"
     ],
     "updates": {
       "url": "https://u.expo.dev/dd902338-e397-4b69-8268-c12afdd38f6a"

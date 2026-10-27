@@ -28,6 +28,7 @@ interface ProjectionChartProps {
   mcSummary: MonteCarloSummary;
   displayHorizon: number;
   baseCountry: SupportedCountry;
+  customWidth?: number;
   onOpenEducationModal?: (topic: 'riskcone' | 'waterfall') => void;
 }
 
@@ -36,6 +37,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   mcSummary,
   displayHorizon = 30,
   baseCountry = 'IN',
+  customWidth,
   onOpenEducationModal,
 }) => {
   const { colors } = useTheme();
@@ -53,7 +55,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const displayedP10 = mcSummary.p10Trajectory.slice(0, effectiveHorizon);
   const displayedP90 = mcSummary.p90Trajectory.slice(0, effectiveHorizon);
 
-  const containerWidth = Math.min(windowWidth - 36, 880);
+  const containerWidth = customWidth ? Math.max(280, customWidth) : Math.min(windowWidth - 36, 880);
   const chartHeight = 270;
   const paddingLeft = 54;
   const paddingRight = 16;
