@@ -2,19 +2,36 @@ import { COUNTRY_PROFILES, calculateMultiAssetBlendedB3 } from './historicalData
 import { runDeterministicSimulation } from './simulationEngine';
 import { MonteCarloSummary, SimulationInputs } from './types';
 
-function randomNormal(mean = 0, stdDev = 1): number {
-  let u = 0;
-  let v = 0;
-  while (u === 0) u = Math.random();
-  while (v === 0) v = Math.random();
-  const num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-  return mean + stdDev * num;
+// Deterministic PRNG (Mulberry32) for reproducible, stable actuarial simulations
+function createMulberry32(seed: number) {
+  let s = seed | 0;
+  return function () {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Box-Muller normal transform driven by deterministic PRNG
+function createSeededRandomNormal(prng: () => number) {
+  return function (mean = 0, stdDev = 1): number {
+    let u = 0;
+    let v = 0;
+    while (u === 0) u = prng();
+    while (v === 0) v = prng();
+    const num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    return mean + stdDev * num;
+  };
 }
 
 export function runMonteCarloSimulation(
   inputs: SimulationInputs,
   runs = 500
 ): MonteCarloSummary {
+  // Deterministic seed ensures identical parameters produce identical, rock-solid success rates
+  const prng = createMulberry32(133742);
+  const randomNormal = createSeededRandomNormal(prng);
   const countryProfile = COUNTRY_PROFILES[inputs.baseCountry || 'IN'] || COUNTRY_PROFILES.IN;
   const blendedB3 = calculateMultiAssetBlendedB3(
     inputs.baseCountry || 'IN',

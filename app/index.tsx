@@ -90,6 +90,7 @@ export default function SimulationDashboard() {
 
   const handleSuggestSafeWithdrawal = () => {
     const safeAmount = calculateSafeMonthlyWithdrawal(inputs);
+    if (inputs.monthlyWithdrawal === safeAmount) return;
     setInputs((prev) => ({
       ...prev,
       monthlyWithdrawal: safeAmount,

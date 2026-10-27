@@ -69,96 +69,98 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Navigation Tabs */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.tabsRow}
-            contentContainerStyle={{ gap: 6 }}
-          >
-            <TouchableOpacity
-              onPress={() => setActiveTab('riskcone')}
-              style={[
-                styles.tabChip,
-                {
-                  backgroundColor:
-                    activeTab === 'riskcone' ? colors.accent : colors.surfaceElevated,
-                  borderColor: activeTab === 'riskcone' ? colors.accent : colors.borderSubtle,
-                },
-              ]}
+          {/* Navigation Tabs (Pinned with flexShrink: 0 so they never hide behind details) */}
+          <View style={styles.tabsContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.tabsRow}
+              contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }}
             >
-              <Text
+              <TouchableOpacity
+                onPress={() => setActiveTab('riskcone')}
                 style={[
-                  styles.tabChipText,
-                  { color: activeTab === 'riskcone' ? '#FFFFFF' : colors.textPrimary },
+                  styles.tabChip,
+                  {
+                    backgroundColor:
+                      activeTab === 'riskcone' ? colors.accent : colors.surfaceElevated,
+                    borderColor: activeTab === 'riskcone' ? colors.accent : colors.borderSubtle,
+                  },
                 ]}
               >
-                📊 Risk Cone & P10
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.tabChipText,
+                    { color: activeTab === 'riskcone' ? '#FFFFFF' : colors.textPrimary },
+                  ]}
+                >
+                  📊 Risk Cone & P10
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setActiveTab('buckets')}
-              style={[
-                styles.tabChip,
-                {
-                  backgroundColor:
-                    activeTab === 'buckets' ? colors.accent : colors.surfaceElevated,
-                  borderColor: activeTab === 'buckets' ? colors.accent : colors.borderSubtle,
-                },
-              ]}
-            >
-              <Text
+              <TouchableOpacity
+                onPress={() => setActiveTab('buckets')}
                 style={[
-                  styles.tabChipText,
-                  { color: activeTab === 'buckets' ? '#FFFFFF' : colors.textPrimary },
+                  styles.tabChip,
+                  {
+                    backgroundColor:
+                      activeTab === 'buckets' ? colors.accent : colors.surfaceElevated,
+                    borderColor: activeTab === 'buckets' ? colors.accent : colors.borderSubtle,
+                  },
                 ]}
               >
-                🪣 The 3 Buckets
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.tabChipText,
+                    { color: activeTab === 'buckets' ? '#FFFFFF' : colors.textPrimary },
+                  ]}
+                >
+                  🪣 The 3 Buckets
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setActiveTab('waterfall')}
-              style={[
-                styles.tabChip,
-                {
-                  backgroundColor:
-                    activeTab === 'waterfall' ? colors.accent : colors.surfaceElevated,
-                  borderColor: activeTab === 'waterfall' ? colors.accent : colors.borderSubtle,
-                },
-              ]}
-            >
-              <Text
+              <TouchableOpacity
+                onPress={() => setActiveTab('waterfall')}
                 style={[
-                  styles.tabChipText,
-                  { color: activeTab === 'waterfall' ? '#FFFFFF' : colors.textPrimary },
+                  styles.tabChip,
+                  {
+                    backgroundColor:
+                      activeTab === 'waterfall' ? colors.accent : colors.surfaceElevated,
+                    borderColor: activeTab === 'waterfall' ? colors.accent : colors.borderSubtle,
+                  },
                 ]}
               >
-                🌊 Waterfall Refill
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.tabChipText,
+                    { color: activeTab === 'waterfall' ? '#FFFFFF' : colors.textPrimary },
+                  ]}
+                >
+                  🌊 Waterfall Refill
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setActiveTab('swr')}
-              style={[
-                styles.tabChip,
-                {
-                  backgroundColor: activeTab === 'swr' ? colors.accent : colors.surfaceElevated,
-                  borderColor: activeTab === 'swr' ? colors.accent : colors.borderSubtle,
-                },
-              ]}
-            >
-              <Text
+              <TouchableOpacity
+                onPress={() => setActiveTab('swr')}
                 style={[
-                  styles.tabChipText,
-                  { color: activeTab === 'swr' ? '#FFFFFF' : colors.textPrimary },
+                  styles.tabChip,
+                  {
+                    backgroundColor: activeTab === 'swr' ? colors.accent : colors.surfaceElevated,
+                    borderColor: activeTab === 'swr' ? colors.accent : colors.borderSubtle,
+                  },
                 ]}
               >
-                🛡️ Safe Withdrawal (SWR)
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
+                <Text
+                  style={[
+                    styles.tabChipText,
+                    { color: activeTab === 'swr' ? '#FFFFFF' : colors.textPrimary },
+                  ]}
+                >
+                  🛡️ Safe Withdrawal (SWR)
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
 
           {/* Tab Content */}
           <ScrollView style={styles.contentScroll} showsVerticalScrollIndicator={false}>
@@ -520,10 +522,11 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   header: {
+    flexShrink: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   title: {
     fontSize: 18,
@@ -537,13 +540,18 @@ const styles = StyleSheet.create({
   closeBtn: {
     padding: 6,
   },
+  tabsContainer: {
+    flexShrink: 0,
+    marginBottom: 12,
+    zIndex: 10,
+  },
   tabsRow: {
     flexDirection: 'row',
-    marginBottom: 14,
+    flexGrow: 0,
   },
   tabChip: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 10,
     borderWidth: 1,
   },
@@ -552,7 +560,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   contentScroll: {
-    maxHeight: 520,
+    flex: 1,
+    minHeight: 200,
   },
   topicBlock: {
     gap: 12,
