@@ -1143,24 +1143,40 @@ export const InputSection: React.FC<InputSectionProps> = ({
       {/* 5. Bucket Tenures & Time Horizons */}
       <View style={[styles.roiSection, { borderTopColor: colors.borderSubtle }]}>
         <View style={styles.roiHeader}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 220 }}>
+          {/* Title Row with Protection Buffer Badge */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 8,
+              marginBottom: 4,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1 }}>
               <Layers size={18} color={colors.accent} style={{ marginRight: 8 }} />
-              <View>
-                <Text style={[styles.roiTitle, { color: colors.textPrimary }]}>
-                  Bucket Tenures & Time Horizons
-                </Text>
-                <Text style={[styles.roiSubtitle, { color: colors.textMuted }]}>
-                  Customize cash runway and debt duration. Bucket 3 growth horizon is auto-determined.
-                </Text>
-              </View>
+              <Text style={[styles.roiTitle, { color: colors.textPrimary }]}>
+                Bucket Tenures & Time Horizons
+              </Text>
             </View>
-            <View style={[styles.totalBufferPill, { backgroundColor: colors.accent + '15', borderColor: colors.accent + '40' }]}>
+
+            <View
+              style={[
+                styles.totalBufferPill,
+                { backgroundColor: colors.accent + '15', borderColor: colors.accent + '40' },
+              ]}
+            >
               <Text style={[styles.totalBufferPillText, { color: colors.accent }]}>
-                {totalBufferY}Y Total Protection Buffer
+                🛡️ {totalBufferY}Y Protection Buffer
               </Text>
             </View>
           </View>
+
+          {/* Full-Width Subtitle (Cleanly placed below, zero overlap) */}
+          <Text style={[styles.roiSubtitle, { color: colors.textMuted, marginLeft: 26 }]}>
+            Customize cash runway and debt duration. Bucket 3 growth horizon is auto-determined.
+          </Text>
         </View>
 
         {/* Visual Timeline Flow Ribbon */}
