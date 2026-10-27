@@ -8,6 +8,8 @@ import {
   Switch,
   ScrollView,
   Modal,
+  useWindowDimensions,
+  Platform,
 } from 'react-native';
 import {
   Sparkles,
@@ -80,6 +82,8 @@ export const InputSection: React.FC<InputSectionProps> = ({
   onOpenEducationModal,
 }) => {
   const { colors } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const isCompact = screenWidth < 500;
   const country = inputs.baseCountry || 'IN';
   const meta = COUNTRY_METAS[country] || COUNTRY_METAS.IN;
 
@@ -893,7 +897,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
             { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
           ]}
         >
-          <Text style={[styles.currencyPrefix, { color: colors.textSecondary }]}>
+          <Text style={[styles.currencyPrefix, { color: colors.accent }]}>
             {meta.currencySymbol}
           </Text>
           <TextInput
@@ -903,6 +907,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
             keyboardType="number-pad"
             placeholder="e.g. 20000000"
             placeholderTextColor={colors.textMuted}
+            underlineColorAndroid="transparent"
           />
           <TouchableOpacity
             style={[styles.inlineDropdownTrigger, { backgroundColor: colors.surfaceElevated }]}
@@ -947,7 +952,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
             { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
           ]}
         >
-          <Text style={[styles.currencyPrefix, { color: colors.textSecondary }]}>
+          <Text style={[styles.currencyPrefix, { color: colors.accent }]}>
             {meta.currencySymbol}
           </Text>
           <TextInput
@@ -957,10 +962,11 @@ export const InputSection: React.FC<InputSectionProps> = ({
             keyboardType="number-pad"
             placeholder="e.g. 60000"
             placeholderTextColor={colors.textMuted}
+            underlineColorAndroid="transparent"
           />
 
           <TouchableOpacity
-            style={[styles.inlineDropdownTrigger, { backgroundColor: colors.surfaceElevated, marginRight: 6 }]}
+            style={[styles.inlineDropdownTrigger, { backgroundColor: colors.surfaceElevated, marginRight: isCompact ? 0 : 6 }]}
             onPress={() => setIsWithdrawalModalOpen(true)}
             activeOpacity={0.7}
           >
@@ -969,20 +975,35 @@ export const InputSection: React.FC<InputSectionProps> = ({
             </Text>
           </TouchableOpacity>
 
+          {!isCompact && (
+            <TouchableOpacity
+              style={[styles.suggestBtn, { backgroundColor: colors.accent }]}
+              onPress={onSuggestSafeWithdrawal}
+              activeOpacity={0.8}
+            >
+              <Sparkles size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+              <Text style={styles.suggestBtnText}>Suggest Safe</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {isCompact && (
           <TouchableOpacity
-            style={[styles.suggestBtn, { backgroundColor: colors.accent }]}
+            style={[styles.suggestBtnFull, { backgroundColor: colors.accent }]}
             onPress={onSuggestSafeWithdrawal}
             activeOpacity={0.8}
           >
-            <Sparkles size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-            <Text style={styles.suggestBtnText}>Suggest Safe</Text>
+            <Sparkles size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.suggestBtnText}>
+              Suggest Safe SWR: {formatCurrency(dynamicSafeBenchmark, country)} / mo
+            </Text>
           </TouchableOpacity>
-        </View>
+        )}
       </View>
 
       {/* 3. Start Date & Inflation */}
-      <View style={styles.twoColRow}>
-        <View style={{ flex: 1, marginRight: 8 }}>
+      <View style={[styles.twoColRow, isCompact && { flexDirection: 'column', gap: 10 }]}>
+        <View style={[{ flex: 1 }, !isCompact && { marginRight: 8 }]}>
           <DatePickerInput
             label="Retirement Start Date"
             value={inputs.startDate}
@@ -990,7 +1011,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
           />
         </View>
 
-        <View style={{ flex: 1, marginLeft: 8 }}>
+        <View style={[{ flex: 1 }, !isCompact && { marginLeft: 8 }]}>
           <View style={styles.labelRowSub}>
             <Text style={[styles.fieldLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
               Expected Inflation (%)
@@ -1021,6 +1042,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
               keyboardType="decimal-pad"
               placeholder={meta.defaultInflation.toString()}
               placeholderTextColor={colors.textMuted}
+              underlineColorAndroid="transparent"
             />
             <TouchableOpacity
               onPress={() => setIsInflationModalOpen(true)}
@@ -2217,9 +2239,10 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: '700',
     fontFamily: 'System',
-    paddingVertical: 8,
+    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
   },
   suggestBtn: {
     flexDirection: 'row',
@@ -2227,6 +2250,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
+  },
+  suggestBtnFull: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    marginTop: 8,
   },
   suggestBtnText: {
     color: '#FFFFFF',
@@ -2559,6 +2591,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
+    maxHeight: '90%',
     borderRadius: 20,
     borderWidth: 1,
     padding: 20,

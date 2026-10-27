@@ -77,10 +77,20 @@ export default function SimulationDashboard() {
   const { colors, theme, toggleTheme } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
-  // Responsive landscape detection for tablets, desktops, and rotated phones
-  const isLandscape = windowWidth > windowHeight && windowWidth >= 720;
+  // Responsive landscape detection:
+  // 1. Tablet & Desktop: Wide display (>= 960) and ample vertical height (>= 520)
+  const isTabletOrDesktop = windowWidth >= 960 && windowHeight >= 520;
+
+  // 2. Mobile Phone Landscape: Wide width (windowWidth > windowHeight) but short vertical height (< 520)
+  const isPhoneLandscape = windowWidth > windowHeight && windowHeight < 520;
+
+  // Backward compatibility alias for desktop split view
+  const isLandscape = isTabletOrDesktop;
   const leftPanelWidth = Math.min(480, Math.round(windowWidth * 0.43));
   const landscapeChartWidth = Math.max(320, windowWidth - leftPanelWidth - 64);
+
+  // Active view tab when mobile phone is auto-rotated to landscape
+  const [phoneLandscapeTab, setPhoneLandscapeTab] = useState<'chart' | 'inputs' | 'insights'>('chart');
 
   const [inputs, setInputs] = useState<SimulationInputs>(DEFAULT_INPUTS);
   const [strategyModalVisible, setStrategyModalVisible] = useState(false);
@@ -257,7 +267,7 @@ export default function SimulationDashboard() {
               </Text>
               <View style={[styles.proBadge, { backgroundColor: colors.accent + '25' }]}>
                 <Text style={[styles.proBadgeText, { color: colors.accent }]}>
-                  {isLandscape ? 'LANDSCAPE SPLIT' : '80Y PRO'}
+                  {isTabletOrDesktop ? 'DESKTOP SPLIT' : isPhoneLandscape ? 'PANORAMIC WIDE' : '80Y PRO'}
                 </Text>
               </View>
             </View>
@@ -358,9 +368,9 @@ export default function SimulationDashboard() {
         </View>
       )}
 
-      {/* Dynamic Responsive Layout: Landscape Split View vs Portrait Single Column */}
-      {isLandscape ? (
-        /* Landscape 2-Column Split View */
+      {/* Dynamic Responsive Layout: Tablet Split Dashboard vs Auto-Rotated Phone Panoramic vs Portrait Single Column */}
+      {isTabletOrDesktop ? (
+        /* Tablet & Desktop 2-Column Split View */
         <View style={styles.landscapeContainer}>
           {/* Left Column: Fixed / Scrollable Configuration Panel */}
           <View
@@ -476,6 +486,131 @@ export default function SimulationDashboard() {
               </View>
             </ScrollView>
           </View>
+        </View>
+      ) : isPhoneLandscape ? (
+        /* Phone Landscape Panoramic View: Optimized for auto-rotated phones */
+        <View style={styles.phoneLandscapeContainer}>
+          {/* Panoramic Segmented Switcher */}
+          <View style={[styles.phoneLandscapeTabBar, { backgroundColor: colors.surface, borderBottomColor: colors.borderSubtle }]}>
+            <TouchableOpacity
+              onPress={() => setPhoneLandscapeTab('chart')}
+              style={[
+                styles.phoneLandscapeTabBtn,
+                phoneLandscapeTab === 'chart' && { backgroundColor: colors.accent + '20', borderColor: colors.accent },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.phoneLandscapeTabText,
+                  { color: phoneLandscapeTab === 'chart' ? colors.accent : colors.textSecondary },
+                ]}
+              >
+                📊 Panoramic Chart & Schedule
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setPhoneLandscapeTab('inputs')}
+              style={[
+                styles.phoneLandscapeTabBtn,
+                phoneLandscapeTab === 'inputs' && { backgroundColor: colors.accent + '20', borderColor: colors.accent },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.phoneLandscapeTabText,
+                  { color: phoneLandscapeTab === 'inputs' ? colors.accent : colors.textSecondary },
+                ]}
+              >
+                ⚙️ Strategy Inputs & ROI
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setPhoneLandscapeTab('insights')}
+              style={[
+                styles.phoneLandscapeTabBtn,
+                phoneLandscapeTab === 'insights' && { backgroundColor: colors.accent + '20', borderColor: colors.accent },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.phoneLandscapeTabText,
+                  { color: phoneLandscapeTab === 'insights' ? colors.accent : colors.textSecondary },
+                ]}
+              >
+                💡 Strategy Insights
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.phoneLandscapeScroll} showsVerticalScrollIndicator={false}>
+            {phoneLandscapeTab === 'chart' && (
+              <View style={styles.phoneLandscapeChartWrap}>
+                <BucketCards
+                  initialCorpus={inputs.initialCorpus}
+                  split={split}
+                  b1Years={inputs.bucket1Years}
+                  b2Years={inputs.bucket2Years}
+                  baseCountry={inputs.baseCountry}
+                  multiCountryAllocations={inputs.multiCountryAllocations}
+                  onSelectBucket={(bNum) => setSelectedBucketModal(bNum)}
+                />
+                <ProjectionChart
+                  results={simResults}
+                  mcSummary={mcSummary}
+                  displayHorizon={inputs.displayHorizon || 30}
+                  baseCountry={inputs.baseCountry}
+                  customWidth={Math.max(340, windowWidth - 32)}
+                  onOpenEducationModal={(topic) => openEducation(topic)}
+                  selectedModel={inputs.selectedModel || 'monte_carlo'}
+                  historicalBacktest={backtestResult}
+                  rollingReturns={rollingResult}
+                  stressTest={stressResult}
+                  goalsBased={goalsResult}
+                  modelComparison={modelComparison}
+                  onSelectModel={(m) => setInputs((prev) => ({ ...prev, selectedModel: m }))}
+                />
+              </View>
+            )}
+
+            {phoneLandscapeTab === 'inputs' && (
+              <View style={styles.phoneLandscapeInputsWrap}>
+                <InputSection
+                  inputs={inputs}
+                  onChangeInputs={setInputs}
+                  onSuggestSafeWithdrawal={handleSuggestSafeWithdrawal}
+                  onOpenEducationModal={() => openEducation('swr')}
+                />
+              </View>
+            )}
+
+            {phoneLandscapeTab === 'insights' && (
+              <View style={styles.phoneLandscapeInsightsWrap}>
+                <InsightsPanel
+                  insights={insights}
+                  mcSummary={mcSummary}
+                  baseCountry={inputs.baseCountry}
+                  simulationHorizon={inputs.simulationHorizon || 30}
+                  selectedModel={inputs.selectedModel || 'monte_carlo'}
+                  historicalBacktest={backtestResult}
+                  rollingReturns={rollingResult}
+                  stressTest={stressResult}
+                  goalsBased={goalsResult}
+                  modelComparison={modelComparison}
+                />
+              </View>
+            )}
+
+            <View style={styles.footerNote}>
+              <Text style={[styles.footerText, { color: colors.textMuted }]}>
+                3-Bucket Strategy Simulation • Auto-Rotated Panoramic Mobile View.
+              </Text>
+            </View>
+          </ScrollView>
         </View>
       ) : (
         /* Portrait Mode: Single-Column Vertical Flow */
@@ -794,5 +929,46 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     lineHeight: 16,
+  },
+  // Phone Landscape Panoramic Mode Styles
+  phoneLandscapeContainer: {
+    flex: 1,
+  },
+  phoneLandscapeTabBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  phoneLandscapeTabBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  phoneLandscapeTabText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  phoneLandscapeScroll: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  phoneLandscapeChartWrap: {
+    width: '100%',
+  },
+  phoneLandscapeInputsWrap: {
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
+  phoneLandscapeInsightsWrap: {
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
   },
 });
