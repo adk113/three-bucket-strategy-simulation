@@ -21,33 +21,19 @@ services:
         source: /*
         destination: /index.html
 
-  # 2. Production Self-Scaling Backend API
+  # 2. Production Backend API (Render Web Service)
   - type: web
     name: three-bucket-api
     runtime: node
-    plan: standard
+    plan: free
     region: oregon
     buildCommand: npm install
-    startCommand: node -e "const http = require('http'); const server = http.createServer((req, res) => { if (req.url === '/healthz') { res.writeHead(200, {'Content-Type': 'application/json'}); res.end(JSON.stringify({ status: 'healthy', uptime: process.uptime() })); } else { res.writeHead(200, {'Content-Type': 'application/json'}); res.end(JSON.stringify({ service: 'three-bucket-api', version: '2.0.0' })); } }); server.listen(process.env.PORT || 3000, () => console.log('API running on port', process.env.PORT || 3000));"
+    startCommand: node server/index.js
     healthCheckPath: /healthz
     autoDeploy: true
-    scaling:
-      minInstances: 2
-      maxInstances: 10
-      targetCPUPercent: 75
-      targetMemoryPercent: 80
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: three-bucket-postgres
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: three-bucket-redis
-          property: connectionString
 
   # 3. Asynchronous Background Task & Calculation Worker
   - type: worker
