@@ -2,7 +2,7 @@
   "expo": {
     "name": "3-Bucket Strategy Simulation",
     "slug": "three-bucket-strategy-simulation",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "scheme": "threebucket",
@@ -21,7 +21,7 @@
         "foregroundImage": "./assets/icon.png"
       },
       "package": "com.anonymous.threebucketstrategy",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "CAMERA",
         "USE_BIOMETRIC",
