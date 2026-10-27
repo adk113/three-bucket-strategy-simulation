@@ -1049,23 +1049,9 @@ export const InputSection: React.FC<InputSectionProps> = ({
         </View>
 
         <View style={[{ flex: 1 }, !isCompact && { marginLeft: 8 }]}>
-          <View style={styles.labelRowSub}>
-            <Text style={[styles.fieldLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
-              Expected Inflation (%)
-            </Text>
-            <TouchableOpacity
-              onPress={() => setIsInflationModalOpen(true)}
-              style={[
-                styles.tinyDropdownBtn,
-                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
-              ]}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tinyDropdownBtnText, { color: colors.accent }]}>
-                0-10% ▾
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+            Expected Inflation
+          </Text>
           <View
             style={[
               styles.inputRow,
@@ -1081,13 +1067,19 @@ export const InputSection: React.FC<InputSectionProps> = ({
               placeholderTextColor={colors.textMuted}
               underlineColorAndroid="transparent"
             />
+            <Text style={[styles.percentSuffix, { color: colors.textSecondary }]}>
+              %
+            </Text>
             <TouchableOpacity
+              style={[
+                styles.inlineDropdownTrigger,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle, borderWidth: 1 },
+              ]}
               onPress={() => setIsInflationModalOpen(true)}
-              style={styles.percentDropdownToggle}
               activeOpacity={0.7}
             >
-              <Text style={[styles.percentDropdownText, { color: colors.accent }]}>
-                % ▾
+              <Text style={[styles.inlineDropdownText, { color: colors.accent }]}>
+                0-10% ▾
               </Text>
             </TouchableOpacity>
           </View>
@@ -2471,6 +2463,11 @@ const styles = StyleSheet.create({
   tinyDropdownBtnText: {
     fontSize: 10,
     fontWeight: '700',
+  },
+  percentSuffix: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginRight: 4,
   },
   percentDropdownToggle: {
     paddingHorizontal: 8,
