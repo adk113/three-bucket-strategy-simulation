@@ -103,10 +103,51 @@ export const InputSection: React.FC<InputSectionProps> = ({
 
   // Multi-country allocation helpers
   const handleUpdateWeight = (idx: number, newWeightStr: string) => {
-    const w = parseInt(newWeightStr.replace(/[^0-9]/g, ''), 10) || 0;
-    const updated = [...inputs.multiCountryAllocations];
-    updated[idx] = { ...updated[idx], weight: Math.min(100, Math.max(0, w)) };
-    onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+    const rawDigits = newWeightStr.replace(/[^0-9]/g, '');
+    const w = rawDigits === '' ? 0 : parseInt(rawDigits, 10);
+    const clamped = Math.min(100, Math.max(0, w));
+    const list = inputs.multiCountryAllocations.map((item) => ({ ...item }));
+
+    if (list.length === 1) {
+      list[0].weight = 100;
+    } else if (list.length === 2) {
+      // With 2 countries, typing X in one automatically balances the other to (100 - X)
+      const otherIdx = idx === 0 ? 1 : 0;
+      list[idx].weight = clamped;
+      list[otherIdx].weight = 100 - clamped;
+    } else {
+      // With 3+ countries, adjust remaining budget proportionally
+      list[idx].weight = clamped;
+      const remainingBudget = 100 - clamped;
+      const otherIndices = list.map((_, i) => i).filter((i) => i !== idx);
+      const otherSum = otherIndices.reduce((sum, i) => sum + list[i].weight, 0);
+
+      if (otherSum > 0) {
+        let allocated = 0;
+        otherIndices.forEach((otherI, i) => {
+          if (i === otherIndices.length - 1) {
+            list[otherI].weight = Math.max(0, remainingBudget - allocated);
+          } else {
+            const share = Math.round((list[otherI].weight / otherSum) * remainingBudget);
+            list[otherI].weight = share;
+            allocated += share;
+          }
+        });
+      } else {
+        const equalShare = Math.floor(remainingBudget / otherIndices.length);
+        let allocated = 0;
+        otherIndices.forEach((otherI, i) => {
+          if (i === otherIndices.length - 1) {
+            list[otherI].weight = Math.max(0, remainingBudget - allocated);
+          } else {
+            list[otherI].weight = equalShare;
+            allocated += equalShare;
+          }
+        });
+      }
+    }
+
+    onChangeInputs({ ...inputs, multiCountryAllocations: list });
   };
 
   const handleToggleManualCountry = (idx: number, isManual: boolean) => {
@@ -139,14 +180,56 @@ export const InputSection: React.FC<InputSectionProps> = ({
 
   const handleAddCountryToEquity = (c: SupportedCountry) => {
     if (inputs.multiCountryAllocations.some((a) => a.country === c)) return;
-    const updated = [...inputs.multiCountryAllocations, { country: c, weight: 20, isManual: false }];
-    onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+    const list = inputs.multiCountryAllocations.map((item) => ({ ...item }));
+
+    if (list.length === 1) {
+      // Transitioning from 1 to 2 countries: default to 60 / 40 split
+      list[0].weight = 60;
+      list.push({ country: c, weight: 40, isManual: false });
+    } else {
+      // Transitioning to 3+ countries: reserve 20% for new country and scale others
+      const newWeight = 20;
+      const scale = (100 - newWeight) / 100;
+      let allocated = 0;
+      list.forEach((item) => {
+        item.weight = Math.round(item.weight * scale);
+        allocated += item.weight;
+      });
+      list.push({ country: c, weight: Math.max(0, 100 - allocated), isManual: false });
+    }
+
+    onChangeInputs({ ...inputs, multiCountryAllocations: list });
   };
 
   const handleRemoveCountry = (idx: number) => {
     if (inputs.multiCountryAllocations.length <= 1) return;
-    const updated = inputs.multiCountryAllocations.filter((_, i) => i !== idx);
-    onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+    const remaining = inputs.multiCountryAllocations
+      .filter((_, i) => i !== idx)
+      .map((item) => ({ ...item }));
+
+    // When US is deleted and only India remains, set India Equity to 100% automatically!
+    if (remaining.length === 1) {
+      remaining[0].weight = 100;
+    } else {
+      // If 2+ countries remain, re-normalize their weights to total exactly 100%
+      const currentSum = remaining.reduce((acc, cur) => acc + cur.weight, 0);
+      if (currentSum > 0) {
+        let allocated = 0;
+        remaining.forEach((item, i) => {
+          if (i === remaining.length - 1) {
+            item.weight = Math.max(0, 100 - allocated);
+          } else {
+            const share = Math.round((item.weight / currentSum) * 100);
+            item.weight = share;
+            allocated += share;
+          }
+        });
+      } else {
+        remaining[0].weight = 100;
+      }
+    }
+
+    onChangeInputs({ ...inputs, multiCountryAllocations: remaining });
   };
 
   const split = calculateInitialSplit(inputs);
@@ -163,38 +246,50 @@ export const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const handleApplySplitPreset = (preset: '100' | '70_30' | '60_40' | '50_50' | 'equal') => {
-    const list = [...inputs.multiCountryAllocations];
+    const list = inputs.multiCountryAllocations.map((a) => ({ ...a }));
     if (list.length === 0) return;
 
     if (preset === '100') {
-      const updated = list.map((a, i) => ({ ...a, weight: i === 0 ? 100 : 0 }));
-      onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+      list.forEach((a, i) => {
+        a.weight = i === 0 ? 100 : 0;
+      });
     } else if (preset === '70_30') {
-      const updated = list.map((a, i) => {
-        if (i === 0) return { ...a, weight: 70 };
-        if (i === 1) return { ...a, weight: 30 };
-        return { ...a, weight: 0 };
-      });
-      onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+      if (list.length >= 2) {
+        list[0].weight = 70;
+        list[1].weight = 30;
+        for (let i = 2; i < list.length; i++) list[i].weight = 0;
+      } else {
+        list[0].weight = 100;
+      }
     } else if (preset === '60_40') {
-      const updated = list.map((a, i) => {
-        if (i === 0) return { ...a, weight: 60 };
-        if (i === 1) return { ...a, weight: 40 };
-        return { ...a, weight: 0 };
-      });
-      onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+      if (list.length >= 2) {
+        list[0].weight = 60;
+        list[1].weight = 40;
+        for (let i = 2; i < list.length; i++) list[i].weight = 0;
+      } else {
+        list[0].weight = 100;
+      }
     } else if (preset === '50_50') {
-      const updated = list.map((a, i) => {
-        if (i === 0) return { ...a, weight: 50 };
-        if (i === 1) return { ...a, weight: 50 };
-        return { ...a, weight: 0 };
-      });
-      onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+      if (list.length >= 2) {
+        list[0].weight = 50;
+        list[1].weight = 50;
+        for (let i = 2; i < list.length; i++) list[i].weight = 0;
+      } else {
+        list[0].weight = 100;
+      }
     } else if (preset === 'equal') {
-      const share = Math.round(100 / list.length);
-      const updated = list.map((a) => ({ ...a, weight: share }));
-      onChangeInputs({ ...inputs, multiCountryAllocations: updated });
+      const share = Math.floor(100 / list.length);
+      let allocated = 0;
+      list.forEach((a, i) => {
+        if (i === list.length - 1) {
+          a.weight = 100 - allocated;
+        } else {
+          a.weight = share;
+          allocated += share;
+        }
+      });
     }
+    onChangeInputs({ ...inputs, multiCountryAllocations: list });
   };
 
   return (
@@ -580,7 +675,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
                       </Text>
                     </View>
                     <Text style={[styles.allocSubAmount, { color: colors.textMuted }]}>
-                      {formatCurrency(allocAmt, country)} • {allocPortionPct}% of Portfolio
+                      {formatCurrency(allocAmt, country)} • {alloc.weight}% of Equity ({allocPortionPct}% of Portfolio)
                     </Text>
                   </View>
 
