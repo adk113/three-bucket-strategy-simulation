@@ -101,52 +101,14 @@ export const InputSection: React.FC<InputSectionProps> = ({
     });
   };
 
-  // Multi-country allocation helpers
+  // Multi-country allocation helpers: allow freeform entry without keystroke interference
   const handleUpdateWeight = (idx: number, newWeightStr: string) => {
     const rawDigits = newWeightStr.replace(/[^0-9]/g, '');
     const w = rawDigits === '' ? 0 : parseInt(rawDigits, 10);
     const clamped = Math.min(100, Math.max(0, w));
-    const list = inputs.multiCountryAllocations.map((item) => ({ ...item }));
-
-    if (list.length === 1) {
-      list[0].weight = 100;
-    } else if (list.length === 2) {
-      // With 2 countries, typing X in one automatically balances the other to (100 - X)
-      const otherIdx = idx === 0 ? 1 : 0;
-      list[idx].weight = clamped;
-      list[otherIdx].weight = 100 - clamped;
-    } else {
-      // With 3+ countries, adjust remaining budget proportionally
-      list[idx].weight = clamped;
-      const remainingBudget = 100 - clamped;
-      const otherIndices = list.map((_, i) => i).filter((i) => i !== idx);
-      const otherSum = otherIndices.reduce((sum, i) => sum + list[i].weight, 0);
-
-      if (otherSum > 0) {
-        let allocated = 0;
-        otherIndices.forEach((otherI, i) => {
-          if (i === otherIndices.length - 1) {
-            list[otherI].weight = Math.max(0, remainingBudget - allocated);
-          } else {
-            const share = Math.round((list[otherI].weight / otherSum) * remainingBudget);
-            list[otherI].weight = share;
-            allocated += share;
-          }
-        });
-      } else {
-        const equalShare = Math.floor(remainingBudget / otherIndices.length);
-        let allocated = 0;
-        otherIndices.forEach((otherI, i) => {
-          if (i === otherIndices.length - 1) {
-            list[otherI].weight = Math.max(0, remainingBudget - allocated);
-          } else {
-            list[otherI].weight = equalShare;
-            allocated += equalShare;
-          }
-        });
-      }
-    }
-
+    const list = inputs.multiCountryAllocations.map((item, i) =>
+      i === idx ? { ...item, weight: clamped } : { ...item }
+    );
     onChangeInputs({ ...inputs, multiCountryAllocations: list });
   };
 
@@ -203,38 +165,35 @@ export const InputSection: React.FC<InputSectionProps> = ({
 
   const handleRemoveCountry = (idx: number) => {
     if (inputs.multiCountryAllocations.length <= 1) return;
+    const deletedWeight = inputs.multiCountryAllocations[idx]?.weight || 0;
     const remaining = inputs.multiCountryAllocations
       .filter((_, i) => i !== idx)
       .map((item) => ({ ...item }));
 
-    // When US is deleted and only India remains, set India Equity to 100% automatically!
-    if (remaining.length === 1) {
-      remaining[0].weight = 100;
-    } else {
-      // If 2+ countries remain, re-normalize their weights to total exactly 100%
-      const currentSum = remaining.reduce((acc, cur) => acc + cur.weight, 0);
-      if (currentSum > 0) {
-        let allocated = 0;
-        remaining.forEach((item, i) => {
-          if (i === remaining.length - 1) {
-            item.weight = Math.max(0, 100 - allocated);
-          } else {
-            const share = Math.round((item.weight / currentSum) * 100);
-            item.weight = share;
-            allocated += share;
-          }
-        });
-      } else {
-        remaining[0].weight = 100;
-      }
-    }
+    // While deleting, the deleted % gets added to the last available entry
+    const lastIdx = remaining.length - 1;
+    remaining[lastIdx].weight = Math.min(100, remaining[lastIdx].weight + deletedWeight);
 
     onChangeInputs({ ...inputs, multiCountryAllocations: remaining });
   };
 
   const split = calculateInitialSplit(inputs);
   const blendedB3 = calculateMultiAssetBlendedB3(country, inputs.multiCountryAllocations);
-  const totalAllocWeight = Math.max(1, inputs.multiCountryAllocations.reduce((acc, cur) => acc + cur.weight, 0));
+  const totalAllocWeight = inputs.multiCountryAllocations.reduce((acc, cur) => acc + cur.weight, 0);
+  const isAllocationBalanced = totalAllocWeight === 100;
+  const lastCountryIdx = inputs.multiCountryAllocations.length - 1;
+  const sumExceptLast = inputs.multiCountryAllocations
+    .slice(0, lastCountryIdx)
+    .reduce((acc, cur) => acc + cur.weight, 0);
+  const neededForLast = Math.max(0, 100 - sumExceptLast);
+
+  const handleBalanceLastEntry = () => {
+    if (inputs.multiCountryAllocations.length === 0) return;
+    const list = inputs.multiCountryAllocations.map((item, i) =>
+      i === lastCountryIdx ? { ...item, weight: neededForLast } : { ...item }
+    );
+    onChangeInputs({ ...inputs, multiCountryAllocations: list });
+  };
 
   const currentGrowthPct =
     inputs.targetGrowthPercent ??
@@ -648,6 +607,23 @@ export const InputSection: React.FC<InputSectionProps> = ({
               Equal
             </Text>
           </TouchableOpacity>
+
+          {/* Validation Status Badge */}
+          {isAllocationBalanced ? (
+            <View style={[styles.sumBadge, { backgroundColor: '#10B98118', borderColor: '#10B98150' }]}>
+              <Text style={[styles.sumBadgeText, { color: '#10B981' }]}>Total: 100% ✓</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={handleBalanceLastEntry}
+              style={[styles.sumBadge, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B60' }]}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.sumBadgeText, { color: '#F59E0B' }]}>
+                Total: {totalAllocWeight}% (Tap to balance last entry to {neededForLast}%)
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* List of active country equity allocations */}
@@ -793,6 +769,24 @@ export const InputSection: React.FC<InputSectionProps> = ({
                     <Text style={[styles.allocStatText, { color: colors.textMuted }]}>
                       Historical Empirical: ~{defaultProfile.nominalReturnMean}% μ • {defaultProfile.stdDev}% σ
                     </Text>
+                  </View>
+                )}
+
+                {/* Last entry balance helper if sum !== 100 */}
+                {idx === lastCountryIdx && inputs.multiCountryAllocations.length > 1 && !isAllocationBalanced && (
+                  <View style={styles.lastEntryNoticeRow}>
+                    <Text style={[styles.lastEntryNoticeText, { color: '#F59E0B' }]}>
+                      Total equity sum is {totalAllocWeight}% (needs {neededForLast > alloc.weight ? `+${neededForLast - alloc.weight}%` : `${neededForLast - alloc.weight}%`} to equal 100%)
+                    </Text>
+                    <TouchableOpacity
+                      onPress={handleBalanceLastEntry}
+                      style={[styles.balanceLastBtn, { backgroundColor: colors.accent + '20', borderColor: colors.accent }]}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.balanceLastBtnText, { color: colors.accent }]}>
+                        Auto-balance to {neededForLast}%
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 )}
               </View>
@@ -1240,6 +1234,41 @@ const styles = StyleSheet.create({
   presetSplitBtnText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  sumBadge: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  sumBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  lastEntryNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  lastEntryNoticeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  balanceLastBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  balanceLastBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   allocSubAmount: {
     fontSize: 10,
