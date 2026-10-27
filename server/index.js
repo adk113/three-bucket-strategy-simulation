@@ -14,8 +14,28 @@
 
 const http = require('http');
 const url = require('url');
+const path = require('path');
+const fs = require('fs');
 
 const PORT = process.env.PORT || 3000;
+const DIST_DIR = path.join(__dirname, '..', 'dist');
+
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.map': 'application/json',
+  '.ttf': 'font/ttf',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+};
 
 // In-memory store for strategies (can be backed by Postgres/Redis via DATABASE_URL)
 const strategiesStore = new Map();
@@ -283,7 +303,14 @@ const server = http.createServer(async (req, res) => {
 
   try {
     // Health Check / Liveness probe for Render
-    if ((pathname === '/healthz' || pathname === '/health') && method === 'GET') {
+    if ((pathname === '/healthz' || pathname === '/health') && (method === 'GET' || method === 'HEAD')) {
+      if (method === 'HEAD') {
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        });
+        return res.end();
+      }
       return sendJSON(res, 200, {
         status: 'healthy',
         service: 'three-bucket-api',
@@ -404,10 +431,15 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // Fallback 404
+    // Static Web App Serving (SPA Fallback from ./dist)
+    if (method === 'GET' || method === 'HEAD') {
+      return serveStaticFile(req, res, pathname);
+    }
+
+    // Fallback 404 for unrecognized non-GET methods
     sendJSON(res, 404, {
       error: 'Not Found',
-      message: `Endpoint ${method} ${pathname} does not exist. Refer to GET /api/info for API catalogue.`
+      message: `Endpoint ${method} ${pathname} does not exist.`
     });
   } catch (error) {
     console.error('API Error:', error);
@@ -419,8 +451,69 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+function serveStaticFile(req, res, reqPath) {
+  if (!fs.existsSync(DIST_DIR)) {
+    return sendJSON(res, 200, {
+      status: 'healthy',
+      message: '3-Bucket Strategy API running. Build web frontend with "npm run build:web" to serve static assets.',
+      apiDocumentation: '/api/info',
+    });
+  }
+
+  // Normalize path & prevent directory traversal
+  let safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
+  if (safePath === '/' || safePath === '' || safePath === '\\') {
+    safePath = '/index.html';
+  }
+
+  let filePath = path.join(DIST_DIR, safePath);
+
+  // If path has no extension, check for .html or subdirectory index.html
+  if (!path.extname(filePath)) {
+    if (fs.existsSync(filePath + '.html')) {
+      filePath = filePath + '.html';
+    } else if (fs.existsSync(path.join(filePath, 'index.html'))) {
+      filePath = path.join(filePath, 'index.html');
+    } else {
+      filePath = path.join(DIST_DIR, 'index.html');
+    }
+  }
+
+  fs.stat(filePath, (err, stats) => {
+    if (err || !stats.isFile()) {
+      // SPA Fallback: serve index.html for unknown client routes
+      const fallbackIndex = path.join(DIST_DIR, 'index.html');
+      if (fs.existsSync(fallbackIndex)) {
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache',
+        });
+        return fs.createReadStream(fallbackIndex).pipe(res);
+      }
+      return sendJSON(res, 404, { error: 'Not Found' });
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    const isImmutable = ext !== '.html' && ext !== '.json';
+
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Cache-Control': isImmutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+      'X-Content-Type-Options': 'nosniff',
+    });
+
+    if (req.method === 'HEAD') {
+      return res.end();
+    }
+
+    fs.createReadStream(filePath).pipe(res);
+  });
+}
+
 server.listen(PORT, () => {
-  console.log(`🚀 Three-Bucket Strategy API running on port ${PORT}`);
+  console.log(`🚀 Three-Bucket Strategy Full-Stack Server running on port ${PORT}`);
   console.log(`   Health Check: http://localhost:${PORT}/healthz`);
   console.log(`   API Info:     http://localhost:${PORT}/api/info`);
+  console.log(`   Web App:      http://localhost:${PORT}/`);
 });
