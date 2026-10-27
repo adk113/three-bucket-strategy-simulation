@@ -1052,37 +1052,29 @@ export const InputSection: React.FC<InputSectionProps> = ({
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
             Expected Inflation
           </Text>
-          <View
+          <TouchableOpacity
+            onPress={() => setIsInflationModalOpen(true)}
             style={[
               styles.inputRow,
-              { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, height: 48 },
+              {
+                backgroundColor: colors.inputBg,
+                borderColor: colors.inputBorder,
+                height: 48,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 14,
+              },
             ]}
+            activeOpacity={0.7}
           >
-            <TextInput
-              style={[styles.input, { color: colors.textPrimary }]}
-              value={inputs.inflationRate.toString()}
-              onChangeText={handleInflationChange}
-              keyboardType="decimal-pad"
-              placeholder={meta.defaultInflation.toString()}
-              placeholderTextColor={colors.textMuted}
-              underlineColorAndroid="transparent"
-            />
-            <Text style={[styles.percentSuffix, { color: colors.textSecondary }]}>
-              %
+            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textPrimary }}>
+              {inputs.inflationRate}%
             </Text>
-            <TouchableOpacity
-              style={[
-                styles.inlineDropdownTrigger,
-                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle, borderWidth: 1 },
-              ]}
-              onPress={() => setIsInflationModalOpen(true)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.inlineDropdownText, { color: colors.accent }]}>
-                0-10% ▾
-              </Text>
-            </TouchableOpacity>
-          </View>
+            <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 14 }}>
+              ▾
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -2367,6 +2359,47 @@ export const InputSection: React.FC<InputSectionProps> = ({
               >
                 <X size={18} color={colors.textSecondary} />
               </TouchableOpacity>
+            </View>
+
+            {/* Direct Decimal Input Field */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 10,
+                borderRadius: 10,
+                backgroundColor: colors.surfaceElevated,
+                borderWidth: 1,
+                borderColor: colors.borderSubtle,
+                marginBottom: 12,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginRight: 10 }}>
+                Custom %:
+              </Text>
+              <TextInput
+                style={{
+                  flex: 1,
+                  fontSize: 16,
+                  fontWeight: '700',
+                  color: colors.textPrimary,
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  backgroundColor: colors.inputBg,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: colors.inputBorder,
+                }}
+                value={inputs.inflationRate.toString()}
+                onChangeText={handleInflationChange}
+                keyboardType="decimal-pad"
+                placeholder={meta.defaultInflation.toString()}
+                placeholderTextColor={colors.textMuted}
+                underlineColorAndroid="transparent"
+              />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textSecondary, marginLeft: 8 }}>
+                %
+              </Text>
             </View>
 
             <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
