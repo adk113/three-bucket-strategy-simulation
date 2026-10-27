@@ -8,6 +8,35 @@ export interface CrossBorderEquityAllocation {
   customStdDev?: number; // % p.a.
 }
 
+export type WealthModelType =
+  | 'monte_carlo'
+  | 'historical_backtest'
+  | 'rolling_returns'
+  | 'stress_testing'
+  | 'goals_based'
+  | 'comparison';
+
+export type HistoricalCrisisType =
+  | '2008_gfc'
+  | '2000_dotcom'
+  | '2020_covid'
+  | '1973_stagflation';
+
+export type StressScenarioType =
+  | 'equity_crash_30_inflation_8'
+  | 'stagflation_shock'
+  | 'dual_asset_selloff_2022'
+  | 'prolonged_bear_market';
+
+export interface GoalMilestone {
+  id: string;
+  name: string;
+  targetYear: number;
+  amount: number;
+  bucketPriority: 1 | 2 | 3;
+  category: 'education' | 'property' | 'lifestyle' | 'healthcare' | 'legacy';
+}
+
 export interface SimulationInputs {
   initialCorpus: number;
   monthlyWithdrawal: number;
@@ -35,6 +64,13 @@ export interface SimulationInputs {
     bucket2: number;
     bucket3: number;
   };
+
+  // Wealth Management Analytical Model Configuration
+  selectedModel?: WealthModelType;
+  historicalCrisis?: HistoricalCrisisType;
+  rollingWindowYears?: 3 | 5 | 10;
+  stressTestScenario?: StressScenarioType;
+  goalMilestones?: GoalMilestone[];
 }
 
 export interface YearSimulationResult {
@@ -69,6 +105,85 @@ export interface MonteCarloSummary {
   diversificationBenefitVolReduction: number;
 }
 
+export interface HistoricalBacktestResult {
+  scenarioKey: HistoricalCrisisType;
+  title: string;
+  description: string;
+  historicalPeriod: string;
+  yearlyResults: YearSimulationResult[];
+  trajectory: number[];
+  maxDrawdownPct: number;
+  troughYear: number;
+  recoveryYears: number | null;
+  terminalBalance: number;
+  survived: boolean;
+}
+
+export interface RollingReturnsResult {
+  windowYears: number;
+  minReturnPct: number;
+  medianReturnPct: number;
+  maxReturnPct: number;
+  positiveReturnProbabilityPct: number;
+  bestTrajectory: number[];
+  medianTrajectory: number[];
+  worstTrajectory: number[];
+  terminalBalanceMedian: number;
+  terminalBalanceWorst: number;
+  terminalBalanceBest: number;
+}
+
+export interface StressTestResult {
+  scenarioKey: StressScenarioType;
+  title: string;
+  description: string;
+  shockDetails: string;
+  yearlyResults: YearSimulationResult[];
+  trajectory: number[];
+  terminalBalance: number;
+  lowestCorpusTrough: number;
+  troughYear: number;
+  survived: boolean;
+  cushionRemainingPct: number;
+}
+
+export interface GoalsMilestoneStatus {
+  milestone: GoalMilestone;
+  fundedAmount: number;
+  isFullyFunded: boolean;
+  fundingPct: number;
+  projectedCorpusAtMilestone: number;
+}
+
+export interface GoalsBasedResult {
+  yearlyResults: YearSimulationResult[];
+  trajectory: number[];
+  milestoneStatuses: GoalsMilestoneStatus[];
+  allMilestonesFunded: boolean;
+  terminalLegacySurplus: number;
+  shortTermRunwayYears: number;
+  mediumTermShieldFunded: boolean;
+}
+
+export interface ModelComparisonItem {
+  id: WealthModelType;
+  name: string;
+  category: string;
+  whatItAnswers: string;
+  bestUsedFor: string;
+  trajectory: number[];
+  terminalBalance: number;
+  keyMetricLabel: string;
+  keyMetricValue: string;
+  status: 'excellent' | 'good' | 'caution' | 'danger';
+  color: string;
+}
+
+export interface ModelComparisonSummary {
+  models: ModelComparisonItem[];
+  recommendation: string;
+}
+
 export interface StrategyInsight {
   type: 'success' | 'warning' | 'danger' | 'info';
   title: string;
@@ -82,3 +197,4 @@ export interface SavedStrategy {
   createdAt: string;
   inputs: SimulationInputs;
 }
+

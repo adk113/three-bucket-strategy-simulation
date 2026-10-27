@@ -26,6 +26,14 @@ import { calculateInitialSplit, runDeterministicSimulation } from '../src/engine
 import { runMonteCarloSimulation } from '../src/engine/monteCarlo';
 import { calculateSafeMonthlyWithdrawal } from '../src/engine/safeWithdrawal';
 import { generateStrategyInsights } from '../src/engine/insightsEngine';
+import {
+  runHistoricalBacktest,
+  runRollingReturnsAnalysis,
+  runDeterministicStressTest,
+  runGoalsBasedWealth,
+  generateModelComparison,
+  DEFAULT_GOAL_MILESTONES,
+} from '../src/engine/wealthModelsEngine';
 import { InputSection } from '../src/components/simulation/InputSection';
 import { BucketCards } from '../src/components/simulation/BucketCards';
 import { ProjectionChart } from '../src/components/simulation/ProjectionChart';
@@ -58,6 +66,11 @@ const DEFAULT_INPUTS: SimulationInputs = {
     bucket2: 8.0,
     bucket3: 12.0,
   },
+  selectedModel: 'monte_carlo',
+  historicalCrisis: '2008_gfc',
+  rollingWindowYears: 5,
+  stressTestScenario: 'equity_crash_30_inflation_8',
+  goalMilestones: DEFAULT_GOAL_MILESTONES,
 };
 
 export default function SimulationDashboard() {
@@ -73,7 +86,9 @@ export default function SimulationDashboard() {
   const [strategyModalVisible, setStrategyModalVisible] = useState(false);
   const [selectedBucketModal, setSelectedBucketModal] = useState<1 | 2 | 3 | null>(null);
   const [glossaryModalVisible, setGlossaryModalVisible] = useState(false);
-  const [glossaryTopic, setGlossaryTopic] = useState<'riskcone' | 'buckets' | 'waterfall' | 'swr'>('riskcone');
+  const [glossaryTopic, setGlossaryTopic] = useState<
+    'riskcone' | 'buckets' | 'waterfall' | 'swr' | 'methodologies'
+  >('riskcone');
 
   // Export engine state
   const [isExporting, setIsExporting] = useState(false);
@@ -83,6 +98,26 @@ export default function SimulationDashboard() {
   const split = useMemo(() => calculateInitialSplit(inputs), [inputs]);
   const simResults = useMemo(() => runDeterministicSimulation(inputs), [inputs]);
   const mcSummary = useMemo(() => runMonteCarloSimulation(inputs, 500), [inputs]);
+
+  // Alternative Wealth Management Analytical Models
+  const backtestResult = useMemo(
+    () => runHistoricalBacktest(inputs, inputs.historicalCrisis),
+    [inputs]
+  );
+  const rollingResult = useMemo(
+    () => runRollingReturnsAnalysis(inputs, inputs.rollingWindowYears || 5),
+    [inputs]
+  );
+  const stressResult = useMemo(
+    () => runDeterministicStressTest(inputs, inputs.stressTestScenario),
+    [inputs]
+  );
+  const goalsResult = useMemo(() => runGoalsBasedWealth(inputs), [inputs]);
+  const modelComparison = useMemo(
+    () => generateModelComparison(inputs, simResults, mcSummary),
+    [inputs, simResults, mcSummary]
+  );
+
   const insights = useMemo(
     () => generateStrategyInsights(inputs, simResults, mcSummary),
     [inputs, simResults, mcSummary]
@@ -101,7 +136,9 @@ export default function SimulationDashboard() {
     setInputs(DEFAULT_INPUTS);
   };
 
-  const openEducation = (topic: 'riskcone' | 'buckets' | 'waterfall' | 'swr' = 'riskcone') => {
+  const openEducation = (
+    topic: 'riskcone' | 'buckets' | 'waterfall' | 'swr' | 'methodologies' = 'riskcone'
+  ) => {
     setGlossaryTopic(topic);
     setGlossaryModalVisible(true);
   };
@@ -119,6 +156,61 @@ export default function SimulationDashboard() {
 
   const countryMeta = COUNTRY_METAS[inputs.baseCountry || 'IN'] || COUNTRY_METAS.IN;
   const activeCountriesList = inputs.multiCountryAllocations.map((a) => a.country);
+
+  // Dynamic quick status reflecting active wealth model
+  const quickStatMeta = useMemo(() => {
+    const m = inputs.selectedModel || 'monte_carlo';
+    if (m === 'historical_backtest') {
+      return {
+        label: `${(inputs.historicalCrisis || '2008_gfc').toUpperCase().replace('_', ' ')} Drawdown`,
+        val: `-${backtestResult.maxDrawdownPct}%`,
+        color: backtestResult.survived ? '#10B981' : '#EF4444',
+      };
+    }
+    if (m === 'rolling_returns') {
+      return {
+        label: `${rollingResult.windowYears}Y Positive Odds`,
+        val: `${rollingResult.positiveReturnProbabilityPct}%`,
+        color: '#10B981',
+      };
+    }
+    if (m === 'stress_testing') {
+      return {
+        label: 'Shock Cushion',
+        val: `${stressResult.cushionRemainingPct}%`,
+        color: stressResult.cushionRemainingPct >= 50 ? '#10B981' : '#F59E0B',
+      };
+    }
+    if (m === 'goals_based') {
+      const fundedCount = goalsResult.milestoneStatuses.filter((s) => s.isFullyFunded).length;
+      return {
+        label: 'Goals Funded',
+        val: `${fundedCount}/${goalsResult.milestoneStatuses.length}`,
+        color: goalsResult.allMilestonesFunded ? '#10B981' : '#8B5CF6',
+      };
+    }
+    if (m === 'comparison') {
+      return {
+        label: 'Model Comparison',
+        val: '5 Overlaid',
+        color: '#6366F1',
+      };
+    }
+    return {
+      label: `${inputs.simulationHorizon}-Yr Survival`,
+      val: `${mcSummary.successRate}%`,
+      color: mcSummary.successRate >= 90 ? '#10B981' : '#F59E0B',
+    };
+  }, [
+    inputs.selectedModel,
+    inputs.historicalCrisis,
+    inputs.simulationHorizon,
+    backtestResult,
+    rollingResult,
+    stressResult,
+    goalsResult,
+    mcSummary,
+  ]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg }]}>
@@ -308,15 +400,10 @@ export default function SimulationDashboard() {
               <View style={styles.landscapeRightHeaderRow}>
                 <View style={styles.quickStatBox}>
                   <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>
-                    {inputs.simulationHorizon}-Yr Actuarial Survival
+                    {quickStatMeta.label}
                   </Text>
-                  <Text
-                    style={[
-                      styles.quickStatVal,
-                      { color: mcSummary.successRate >= 90 ? '#10B981' : '#F59E0B' },
-                    ]}
-                  >
-                    {mcSummary.successRate}%
+                  <Text style={[styles.quickStatVal, { color: quickStatMeta.color }]}>
+                    {quickStatMeta.val}
                   </Text>
                 </View>
               </View>
@@ -332,7 +419,7 @@ export default function SimulationDashboard() {
                 onSelectBucket={(bNum) => setSelectedBucketModal(bNum)}
               />
 
-              {/* 3. Scalable Trajectory Chart */}
+              {/* 3. Scalable Trajectory & Model Comparison Chart */}
               <ProjectionChart
                 results={simResults}
                 mcSummary={mcSummary}
@@ -340,6 +427,13 @@ export default function SimulationDashboard() {
                 baseCountry={inputs.baseCountry}
                 customWidth={landscapeChartWidth}
                 onOpenEducationModal={(topic) => openEducation(topic)}
+                selectedModel={inputs.selectedModel || 'monte_carlo'}
+                historicalBacktest={backtestResult}
+                rollingReturns={rollingResult}
+                stressTest={stressResult}
+                goalsBased={goalsResult}
+                modelComparison={modelComparison}
+                onSelectModel={(m) => setInputs((prev) => ({ ...prev, selectedModel: m }))}
               />
 
               {/* 4. Actuarial Insights Panel */}
@@ -391,25 +485,20 @@ export default function SimulationDashboard() {
               </View>
               <View style={styles.quickStatBox}>
                 <Text style={[styles.quickStatLabel, { color: colors.textMuted }]}>
-                  {inputs.simulationHorizon}-Yr Survival
+                  {quickStatMeta.label}
                 </Text>
-                <Text
-                  style={[
-                    styles.quickStatVal,
-                    { color: mcSummary.successRate >= 90 ? '#10B981' : '#F59E0B' },
-                  ]}
-                >
-                  {mcSummary.successRate}%
+                <Text style={[styles.quickStatVal, { color: quickStatMeta.color }]}>
+                  {quickStatMeta.val}
                 </Text>
               </View>
             </View>
 
-            {/* 1. Input Section with 80-Year Horizons, Country Blends & Manual Overrides */}
+            {/* 1. Input Section with 80-Year Horizons, Country Blends & Model Choice */}
             <InputSection
               inputs={inputs}
               onChangeInputs={setInputs}
               onSuggestSafeWithdrawal={handleSuggestSafeWithdrawal}
-              onOpenEducationModal={() => openEducation('swr')}
+              onOpenEducationModal={(topic) => openEducation(topic || 'methodologies')}
             />
 
             {/* 2. Live 3-Bucket Allocation Split Cards */}
@@ -423,13 +512,20 @@ export default function SimulationDashboard() {
               onSelectBucket={(bNum) => setSelectedBucketModal(bNum)}
             />
 
-            {/* 3. Trajectory Chart (Scalable to 80 Years) */}
+            {/* 3. Trajectory & Cross-Model Comparison Chart (Scalable to 80 Years) */}
             <ProjectionChart
               results={simResults}
               mcSummary={mcSummary}
               displayHorizon={inputs.displayHorizon || 30}
               baseCountry={inputs.baseCountry}
               onOpenEducationModal={(topic) => openEducation(topic)}
+              selectedModel={inputs.selectedModel || 'monte_carlo'}
+              historicalBacktest={backtestResult}
+              rollingReturns={rollingResult}
+              stressTest={stressResult}
+              goalsBased={goalsResult}
+              modelComparison={modelComparison}
+              onSelectModel={(m) => setInputs((prev) => ({ ...prev, selectedModel: m }))}
             />
 
 

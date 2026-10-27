@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,8 +19,28 @@ import Svg, {
 } from 'react-native-svg';
 import { useTheme } from '../../theme/ThemeContext';
 import { PALETTE } from '../../theme/colors';
-import { MonteCarloSummary, YearSimulationResult } from '../../engine/types';
-import { LineChart, Layers, ShieldCheck, ArrowRightLeft, HelpCircle } from 'lucide-react-native';
+import {
+  MonteCarloSummary,
+  YearSimulationResult,
+  WealthModelType,
+  HistoricalBacktestResult,
+  RollingReturnsResult,
+  StressTestResult,
+  GoalsBasedResult,
+  ModelComparisonSummary,
+} from '../../engine/types';
+import {
+  LineChart,
+  Layers,
+  ShieldCheck,
+  ArrowRightLeft,
+  HelpCircle,
+  Scale,
+  Activity,
+  History,
+  Target,
+  Zap,
+} from 'lucide-react-native';
 import { SupportedCountry, formatCurrency, formatShortAxis } from '../../utils/currency';
 
 interface ProjectionChartProps {
@@ -29,7 +49,14 @@ interface ProjectionChartProps {
   displayHorizon: number;
   baseCountry: SupportedCountry;
   customWidth?: number;
-  onOpenEducationModal?: (topic: 'riskcone' | 'waterfall') => void;
+  onOpenEducationModal?: (topic: 'riskcone' | 'waterfall' | 'methodologies') => void;
+  selectedModel?: WealthModelType;
+  historicalBacktest?: HistoricalBacktestResult;
+  rollingReturns?: RollingReturnsResult;
+  stressTest?: StressTestResult;
+  goalsBased?: GoalsBasedResult;
+  modelComparison?: ModelComparisonSummary;
+  onSelectModel?: (model: WealthModelType) => void;
 }
 
 export const ProjectionChart: React.FC<ProjectionChartProps> = ({
@@ -39,18 +66,40 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   baseCountry = 'IN',
   customWidth,
   onOpenEducationModal,
+  selectedModel = 'monte_carlo',
+  historicalBacktest,
+  rollingReturns,
+  stressTest,
+  goalsBased,
+  modelComparison,
+  onSelectModel,
 }) => {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
 
-  const [activeTab, setActiveTab] = useState<'stacked' | 'montecarlo'>('stacked');
+  // Active chart tab: 'stacked' | 'montecarlo' | 'active_model' | 'comparison'
+  const [activeTab, setActiveTab] = useState<'stacked' | 'montecarlo' | 'active_model' | 'comparison'>(
+    selectedModel === 'comparison' ? 'comparison' : selectedModel === 'monte_carlo' ? 'montecarlo' : 'active_model'
+  );
+
+  useEffect(() => {
+    if (selectedModel === 'comparison') {
+      setActiveTab('comparison');
+    } else if (selectedModel === 'monte_carlo') {
+      // Keep user choice or default to montecarlo
+    } else {
+      setActiveTab('active_model');
+    }
+  }, [selectedModel]);
+
   const [zoomHorizon, setZoomHorizon] = useState<number | null>(null);
   const [selectedYearIndex, setSelectedYearIndex] = useState<number>(
     Math.min(displayHorizon - 1, 9)
   );
 
-  // Scalable slice up to 80 years (with optional early-retirement zoom lens)
-  const activeDisplayHorizon = zoomHorizon && zoomHorizon < displayHorizon ? zoomHorizon : displayHorizon;
+  // Scalable slice up to 80 years
+  const activeDisplayHorizon =
+    zoomHorizon && zoomHorizon < displayHorizon ? zoomHorizon : displayHorizon;
   const effectiveHorizon = Math.min(results.length, Math.max(5, activeDisplayHorizon));
   const safeYearIndex = Math.min(selectedYearIndex, effectiveHorizon - 1);
   const displayedResults = results.slice(0, effectiveHorizon);
@@ -58,8 +107,18 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const displayedP10 = mcSummary.p10Trajectory.slice(0, effectiveHorizon);
   const displayedP90 = mcSummary.p90Trajectory.slice(0, effectiveHorizon);
 
-  const containerWidth = customWidth ? Math.max(280, customWidth) : Math.min(windowWidth - 36, 880);
-  const chartHeight = 270;
+  // Slices for alternative models
+  const displayedBacktest = historicalBacktest?.trajectory.slice(0, effectiveHorizon) || [];
+  const displayedRollingMedian = rollingReturns?.medianTrajectory.slice(0, effectiveHorizon) || [];
+  const displayedRollingWorst = rollingReturns?.worstTrajectory.slice(0, effectiveHorizon) || [];
+  const displayedRollingBest = rollingReturns?.bestTrajectory.slice(0, effectiveHorizon) || [];
+  const displayedStress = stressTest?.trajectory.slice(0, effectiveHorizon) || [];
+  const displayedGoals = goalsBased?.trajectory.slice(0, effectiveHorizon) || [];
+
+  const containerWidth = customWidth
+    ? Math.max(280, customWidth)
+    : Math.min(windowWidth - 36, 880);
+  const chartHeight = 275;
   const paddingLeft = 54;
   const paddingRight = 16;
   const paddingTop = 22;
@@ -68,9 +127,32 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const innerWidth = containerWidth - paddingLeft - paddingRight;
   const innerHeight = chartHeight - paddingTop - paddingBottom;
 
+  // Compute maximum values across displayed models
   const maxStackTotal = Math.max(...displayedResults.map((r) => r.totalCorpus), 1);
   const maxMCTotal = Math.max(...displayedP90, ...displayedMedian, 1);
-  const maxVal = activeTab === 'stacked' ? maxStackTotal * 1.15 : maxMCTotal * 1.15;
+  const maxComparisonTotal = Math.max(
+    ...displayedMedian,
+    ...displayedBacktest,
+    ...displayedRollingBest,
+    ...displayedStress,
+    ...displayedGoals,
+    1
+  );
+
+  let maxVal = maxStackTotal * 1.15;
+  if (activeTab === 'montecarlo') maxVal = maxMCTotal * 1.15;
+  else if (activeTab === 'comparison') maxVal = maxComparisonTotal * 1.15;
+  else if (activeTab === 'active_model') {
+    if (selectedModel === 'historical_backtest') {
+      maxVal = Math.max(...displayedBacktest, 1) * 1.18;
+    } else if (selectedModel === 'rolling_returns') {
+      maxVal = Math.max(...displayedRollingBest, 1) * 1.18;
+    } else if (selectedModel === 'stress_testing') {
+      maxVal = Math.max(...displayedStress, 1) * 1.18;
+    } else if (selectedModel === 'goals_based') {
+      maxVal = Math.max(...displayedGoals, 1) * 1.18;
+    }
+  }
 
   const scaleY = (val: number) => {
     const clamped = Math.max(0, Math.min(val, maxVal));
@@ -85,7 +167,6 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   // Stacked Area Paths
   const buildStackedAreaPaths = () => {
     if (displayedResults.length === 0) return { b1Path: '', b2Path: '', b3Path: '' };
-
     const bottomY = scaleY(0);
     let b1Line = '';
     let b2Line = '';
@@ -152,12 +233,35 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
     return { p90Line, p50Line, p10Line, bandPath };
   };
 
+  // Build generic line path from an array of numbers
+  const buildLinePath = (data: number[]) => {
+    let path = '';
+    for (let i = 0; i < Math.min(data.length, effectiveHorizon); i++) {
+      const x = scaleX(i);
+      const y = scaleY(data[i] || 0);
+      if (i === 0) path += `M ${x} ${y}`;
+      else path += ` L ${x} ${y}`;
+    }
+    return path;
+  };
+
   const { b1Path, b2Path, b3Path } = buildStackedAreaPaths();
   const { p90Line, p50Line, p10Line, bandPath } = buildMCPaths();
 
+  // Model comparison lines
+  const mcCompLine = buildLinePath(displayedMedian);
+  const backtestCompLine = buildLinePath(displayedBacktest);
+  const rollingMedianCompLine = buildLinePath(displayedRollingMedian);
+  const stressCompLine = buildLinePath(displayedStress);
+  const goalsCompLine = buildLinePath(displayedGoals);
+
+  // Active Model specific paths
+  const rollingBestLine = buildLinePath(displayedRollingBest);
+  const rollingWorstLine = buildLinePath(displayedRollingWorst);
+
   const selectedData = displayedResults[safeYearIndex] || displayedResults[0];
 
-  // Adaptive X-axis tick generator for horizons up to 80 years
+  // Dynamic X-axis ticks
   const generateXTicks = () => {
     const step =
       effectiveHorizon <= 15
@@ -176,6 +280,17 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
     return ticks;
   };
 
+  const activeModelTitle =
+    selectedModel === 'historical_backtest'
+      ? `Historical Backtest (${historicalBacktest?.scenarioKey.toUpperCase().replace('_', ' ')})`
+      : selectedModel === 'rolling_returns'
+      ? `Rolling Returns (${rollingReturns?.windowYears}Y Windows)`
+      : selectedModel === 'stress_testing'
+      ? `Deterministic Stress Shock`
+      : selectedModel === 'goals_based'
+      ? `Goals-Based (GBWM)`
+      : 'Monte Carlo Stochastic Risk Cone';
+
   return (
     <View
       style={[
@@ -187,127 +302,145 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
         },
       ]}
     >
+      {/* Chart Header */}
       <View style={styles.chartHeader}>
-        <View>
+        <View style={{ flex: 1, marginRight: 8 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={[styles.title, { color: colors.textPrimary }]}>
-              Portfolio Trajectory ({effectiveHorizon} Years)
+              {activeTab === 'comparison'
+                ? `Cross-Model Comparison (${effectiveHorizon} Years)`
+                : activeTab === 'active_model'
+                ? `${activeModelTitle} (${effectiveHorizon}Y)`
+                : `Portfolio Trajectory (${effectiveHorizon} Years)`}
             </Text>
             <TouchableOpacity
-              onPress={() => onOpenEducationModal?.(activeTab === 'stacked' ? 'waterfall' : 'riskcone')}
+              onPress={() =>
+                onOpenEducationModal?.(
+                  activeTab === 'comparison'
+                    ? 'methodologies'
+                    : activeTab === 'stacked'
+                    ? 'waterfall'
+                    : 'riskcone'
+                )
+              }
               style={styles.infoIconBtn}
+              activeOpacity={0.7}
             >
               <HelpCircle size={15} color={colors.accent} />
             </TouchableOpacity>
           </View>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             {activeTab === 'stacked'
-              ? 'Multi-Bucket Waterfall Breakdown & Rebalancing'
-              : 'Monte Carlo Stochastic Risk Cone (P10 Bear - P50 Base - P90 Bull)'}
+              ? 'Multi-Bucket Waterfall Breakdown & Refill Mechanics'
+              : activeTab === 'montecarlo'
+              ? 'Monte Carlo Stochastic Risk Cone (P10 Bear - P50 Base - P90 Bull)'
+              : activeTab === 'comparison'
+              ? 'Simultaneous Cross-Comparison of All 5 Wealth Management Methodologies'
+              : selectedModel === 'historical_backtest'
+              ? `Replaying ${historicalBacktest?.title || 'Historical Crisis'}`
+              : selectedModel === 'rolling_returns'
+              ? `Worst, Median, and Best ${rollingReturns?.windowYears || 5}-Year Holding Frequency`
+              : selectedModel === 'stress_testing'
+              ? `${stressTest?.title || 'Macro Shock Simulation'}`
+              : 'Lifecycle Milestone Bucket Allocation & Legacy'}
           </Text>
         </View>
 
+        {/* View Mode Toggle Tabs */}
         <View style={styles.chartHeaderRight}>
-          {/* Optional Quick Zoom Lens if displayHorizon > 30 */}
-          {displayHorizon > 30 ? (
-            <View style={[styles.zoomToggle, { backgroundColor: colors.surfaceElevated }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={[styles.tabToggle, { backgroundColor: colors.surfaceElevated }]}>
               <TouchableOpacity
-                onPress={() => setZoomHorizon(null)}
+                onPress={() => setActiveTab('stacked')}
                 style={[
-                  styles.zoomBtn,
-                  (zoomHorizon === null || zoomHorizon >= displayHorizon) && {
-                    backgroundColor: colors.accent,
-                  },
+                  styles.tabBtn,
+                  activeTab === 'stacked' && { backgroundColor: colors.accent },
                 ]}
               >
+                <Layers
+                  size={13}
+                  color={activeTab === 'stacked' ? '#FFFFFF' : colors.textSecondary}
+                  style={{ marginRight: 4 }}
+                />
                 <Text
                   style={[
-                    styles.zoomBtnText,
-                    {
-                      color:
-                        zoomHorizon === null || zoomHorizon >= displayHorizon
-                          ? '#FFFFFF'
-                          : colors.textSecondary,
-                    },
+                    styles.tabBtnText,
+                    { color: activeTab === 'stacked' ? '#FFFFFF' : colors.textSecondary },
                   ]}
                 >
-                  All ({displayHorizon}Y)
+                  Buckets
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
-                onPress={() => setZoomHorizon(30)}
+                onPress={() => setActiveTab('montecarlo')}
                 style={[
-                  styles.zoomBtn,
-                  zoomHorizon === 30 && { backgroundColor: colors.accent },
+                  styles.tabBtn,
+                  activeTab === 'montecarlo' && { backgroundColor: colors.accent },
                 ]}
               >
+                <LineChart
+                  size={13}
+                  color={activeTab === 'montecarlo' ? '#FFFFFF' : colors.textSecondary}
+                  style={{ marginRight: 4 }}
+                />
                 <Text
                   style={[
-                    styles.zoomBtnText,
-                    { color: zoomHorizon === 30 ? '#FFFFFF' : colors.textSecondary },
+                    styles.tabBtnText,
+                    { color: activeTab === 'montecarlo' ? '#FFFFFF' : colors.textSecondary },
                   ]}
                 >
-                  30Y
+                  Risk Cone
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setZoomHorizon(15)}
-                style={[
-                  styles.zoomBtn,
-                  zoomHorizon === 15 && { backgroundColor: colors.accent },
-                ]}
-              >
-                <Text
+
+              {selectedModel !== 'monte_carlo' && selectedModel !== 'comparison' && (
+                <TouchableOpacity
+                  onPress={() => setActiveTab('active_model')}
                   style={[
-                    styles.zoomBtnText,
-                    { color: zoomHorizon === 15 ? '#FFFFFF' : colors.textSecondary },
+                    styles.tabBtn,
+                    activeTab === 'active_model' && { backgroundColor: colors.accent },
                   ]}
                 >
-                  15Y
+                  <Activity
+                    size={13}
+                    color={activeTab === 'active_model' ? '#FFFFFF' : colors.textSecondary}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={[
+                      styles.tabBtnText,
+                      { color: activeTab === 'active_model' ? '#FFFFFF' : colors.textSecondary },
+                    ]}
+                  >
+                    Active Model
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                onPress={() => setActiveTab('comparison')}
+                style={[
+                  styles.tabBtn,
+                  activeTab === 'comparison' && { backgroundColor: colors.accent },
+                ]}
+              >
+                <Scale
+                  size={13}
+                  color={activeTab === 'comparison' ? '#FFFFFF' : colors.textSecondary}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={[
+                    styles.tabBtnText,
+                    { color: activeTab === 'comparison' ? '#FFFFFF' : colors.textSecondary },
+                  ]}
+                >
+                  ⚖️ Compare All
                 </Text>
               </TouchableOpacity>
             </View>
-          ) : null}
-
-          <View style={[styles.tabToggle, { backgroundColor: colors.surfaceElevated }]}>
-            <TouchableOpacity
-              onPress={() => setActiveTab('stacked')}
-              style={[styles.tabBtn, activeTab === 'stacked' && { backgroundColor: colors.accent }]}
-            >
-              <Layers
-                size={14}
-                color={activeTab === 'stacked' ? '#FFFFFF' : colors.textSecondary}
-                style={{ marginRight: 4 }}
-              />
-              <Text
-                style={[
-                  styles.tabBtnText,
-                  { color: activeTab === 'stacked' ? '#FFFFFF' : colors.textSecondary },
-                ]}
-              >
-                Buckets
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setActiveTab('montecarlo')}
-              style={[styles.tabBtn, activeTab === 'montecarlo' && { backgroundColor: colors.accent }]}
-            >
-              <LineChart
-                size={14}
-                color={activeTab === 'montecarlo' ? '#FFFFFF' : colors.textSecondary}
-                style={{ marginRight: 4 }}
-              />
-              <Text
-                style={[
-                  styles.tabBtnText,
-                  { color: activeTab === 'montecarlo' ? '#FFFFFF' : colors.textSecondary },
-                ]}
-              >
-                Risk Cone
-              </Text>
-            </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </View>
 
@@ -330,6 +463,10 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             <LinearGradient id="mcConeGrad" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0%" stopColor="#38BDF8" stopOpacity="0.35" />
               <Stop offset="100%" stopColor="#818CF8" stopOpacity="0.05" />
+            </LinearGradient>
+            <LinearGradient id="rollingGrad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor="#10B981" stopOpacity="0.25" />
+              <Stop offset="100%" stopColor="#10B981" stopOpacity="0.04" />
             </LinearGradient>
           </Defs>
 
@@ -389,15 +526,17 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             );
           })}
 
-          {/* Layer 1: Stacked Waterfall Area */}
-          {activeTab === 'stacked' ? (
+          {/* Mode 1: Stacked Waterfall Area */}
+          {activeTab === 'stacked' && (
             <G>
               <Path d={b3Path} fill="url(#b3Grad)" />
               <Path d={b2Path} fill="url(#b2Grad)" />
               <Path d={b1Path} fill="url(#b1Grad)" />
             </G>
-          ) : (
-            /* Layer 2: Monte Carlo Risk Cone */
+          )}
+
+          {/* Mode 2: Monte Carlo Risk Cone */}
+          {activeTab === 'montecarlo' && (
             <G>
               <Path d={bandPath} fill="url(#mcConeGrad)" />
               {/* Bull (P90) */}
@@ -421,7 +560,120 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             </G>
           )}
 
-          {/* Vertical cursor */}
+          {/* Mode 3: Active Model Detailed Path */}
+          {activeTab === 'active_model' && (
+            <G>
+              {selectedModel === 'historical_backtest' && (
+                <G>
+                  <Path d={backtestCompLine} fill="none" stroke="#F59E0B" strokeWidth="2.8" />
+                  {historicalBacktest?.troughYear && (
+                    <Circle
+                      cx={scaleX(historicalBacktest.troughYear - 1)}
+                      cy={scaleY(historicalBacktest.trajectory[historicalBacktest.troughYear - 1] || 0)}
+                      r={5}
+                      fill="#EF4444"
+                      stroke="#FFFFFF"
+                      strokeWidth={2}
+                    />
+                  )}
+                </G>
+              )}
+
+              {selectedModel === 'rolling_returns' && (
+                <G>
+                  <Path d={rollingBestLine} fill="none" stroke="#10B981" strokeWidth="2" strokeDasharray="3 3" />
+                  <Path d={rollingMedianCompLine} fill="none" stroke="#10B981" strokeWidth="2.8" />
+                  <Path d={rollingWorstLine} fill="none" stroke="#F59E0B" strokeWidth="2" strokeDasharray="3 3" />
+                </G>
+              )}
+
+              {selectedModel === 'stress_testing' && (
+                <G>
+                  <Path d={stressCompLine} fill="none" stroke="#EC4899" strokeWidth="2.8" />
+                  {stressTest?.troughYear && (
+                    <Circle
+                      cx={scaleX(stressTest.troughYear - 1)}
+                      cy={scaleY(stressTest.lowestCorpusTrough)}
+                      r={5.5}
+                      fill="#EC4899"
+                      stroke="#FFFFFF"
+                      strokeWidth={2}
+                    />
+                  )}
+                </G>
+              )}
+
+              {selectedModel === 'goals_based' && (
+                <G>
+                  <Path d={goalsCompLine} fill="none" stroke="#8B5CF6" strokeWidth="2.8" />
+                  {goalsBased?.milestoneStatuses.map((ms) => {
+                    const yrIdx = Math.min(ms.milestone.targetYear - 1, effectiveHorizon - 1);
+                    return (
+                      <Circle
+                        key={ms.milestone.id}
+                        cx={scaleX(yrIdx)}
+                        cy={scaleY(displayedGoals[yrIdx] || 0)}
+                        r={5}
+                        fill={ms.isFullyFunded ? '#10B981' : '#F59E0B'}
+                        stroke="#FFFFFF"
+                        strokeWidth={1.5}
+                      />
+                    );
+                  })}
+                </G>
+              )}
+            </G>
+          )}
+
+          {/* Mode 4: Multi-Model Comparison Chart */}
+          {activeTab === 'comparison' && (
+            <G>
+              {/* Monte Carlo Median (Cyan) */}
+              <Path d={mcCompLine} fill="none" stroke="#38BDF8" strokeWidth="2.4" />
+              {/* Historical Backtest (Orange) */}
+              <Path d={backtestCompLine} fill="none" stroke="#F59E0B" strokeWidth="2.4" />
+              {/* Rolling Returns Median (Green) */}
+              <Path d={rollingMedianCompLine} fill="none" stroke="#10B981" strokeWidth="2.4" />
+              {/* Stress Test (Pink) */}
+              <Path d={stressCompLine} fill="none" stroke="#EC4899" strokeWidth="2.4" />
+              {/* Goals-Based (Purple) */}
+              <Path d={goalsCompLine} fill="none" stroke="#8B5CF6" strokeWidth="2.4" />
+
+              {/* Inspection dots at selected year */}
+              <Circle
+                cx={scaleX(safeYearIndex)}
+                cy={scaleY(displayedMedian[safeYearIndex] || 0)}
+                r={4}
+                fill="#38BDF8"
+              />
+              <Circle
+                cx={scaleX(safeYearIndex)}
+                cy={scaleY(displayedBacktest[safeYearIndex] || 0)}
+                r={4}
+                fill="#F59E0B"
+              />
+              <Circle
+                cx={scaleX(safeYearIndex)}
+                cy={scaleY(displayedRollingMedian[safeYearIndex] || 0)}
+                r={4}
+                fill="#10B981"
+              />
+              <Circle
+                cx={scaleX(safeYearIndex)}
+                cy={scaleY(displayedStress[safeYearIndex] || 0)}
+                r={4}
+                fill="#EC4899"
+              />
+              <Circle
+                cx={scaleX(safeYearIndex)}
+                cy={scaleY(displayedGoals[safeYearIndex] || 0)}
+                r={4}
+                fill="#8B5CF6"
+              />
+            </G>
+          )}
+
+          {/* Vertical Year Inspection Indicator Line */}
           <Line
             x1={scaleX(safeYearIndex)}
             y1={paddingTop}
@@ -431,22 +683,142 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             strokeWidth="1.5"
             strokeDasharray="3 3"
           />
-
-          <Circle
-            cx={scaleX(safeYearIndex)}
-            cy={scaleY(selectedData.totalCorpus)}
-            r="4.5"
-            fill={colors.accent}
-            stroke="#FFFFFF"
-            strokeWidth="2"
-          />
         </Svg>
       </View>
 
-      {/* Year Selector Chips (Subsampled on 50-80 yr horizons for clean navigation) */}
-      <View style={styles.yearScrollContainer}>
-        <Text style={[styles.inspectPrompt, { color: colors.textMuted }]}>
-          Inspect Year Details (Up to {effectiveHorizon} Years):
+      {/* Chart Legend */}
+      <View style={styles.legendContainer}>
+        {activeTab === 'stacked' ? (
+          <View style={styles.legendRow}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: PALETTE.bucket1.base }]} />
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                Bucket 1 (Cash Liquid)
+              </Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: PALETTE.bucket2.base }]} />
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                Bucket 2 (Income / Debt)
+              </Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: PALETTE.bucket3.base }]} />
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                Bucket 3 (Growth Equities)
+              </Text>
+            </View>
+          </View>
+        ) : activeTab === 'montecarlo' ? (
+          <View style={styles.legendRow}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                P90 Bull Market
+              </Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#38BDF8' }]} />
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                P50 Median Base
+              </Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                P10 Conservative Floor
+              </Text>
+            </View>
+          </View>
+        ) : activeTab === 'active_model' ? (
+          <View style={styles.legendRow}>
+            {selectedModel === 'historical_backtest' ? (
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
+                <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                  {historicalBacktest?.title || 'Historical Crash Replay Path'}
+                </Text>
+              </View>
+            ) : selectedModel === 'rolling_returns' ? (
+              <View style={styles.legendRow}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+                  <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                    Best Block
+                  </Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+                  <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                    Median Block
+                  </Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
+                  <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                    Worst Block
+                  </Text>
+                </View>
+              </View>
+            ) : selectedModel === 'stress_testing' ? (
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#EC4899' }]} />
+                <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                  {stressTest?.title || 'Macro Shock Drawdown Path'}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#8B5CF6' }]} />
+                <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                  Net Corpus After Milestones (GBWM)
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          /* Multi-Model Comparison Legend */
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={[styles.legendRow, { gap: 12 }]}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#38BDF8' }]} />
+                <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                  Monte Carlo (P50)
+                </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
+                <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                  Backtest (2008 GFC)
+                </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+                <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                  Rolling Returns ({rollingReturns?.windowYears || 5}Y)
+                </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#EC4899' }]} />
+                <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                  Stress Shock (8% Infl)
+                </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#8B5CF6' }]} />
+                <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                  Goals-Based GBWM
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+        )}
+      </View>
+
+      {/* Year Selector Ribbon */}
+      <View style={styles.yearRibbon}>
+        <Text style={[styles.yearRibbonLabel, { color: colors.textMuted }]}>
+          Inspect Year:
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.yearScroll}>
           {displayedResults.map((r, idx) => {
@@ -478,92 +850,176 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
       </View>
 
       {/* Year Inspector Card */}
-      <View style={[styles.inspectorCard, { backgroundColor: colors.surfaceElevated }]}>
-        <View style={styles.inspectorHeader}>
-          <Text style={[styles.inspectorYearTitle, { color: colors.textPrimary }]}>
-            Year {selectedData.year} ({selectedData.calendarYear})
-          </Text>
-          <Text style={[styles.inspectorTotalVal, { color: colors.accent }]}>
-            Total: {formatCurrency(selectedData.totalCorpus, baseCountry)}
-          </Text>
+      {activeTab === 'comparison' ? (
+        /* Multi-Model Year Comparison Inspector */
+        <View style={[styles.inspectorCard, { backgroundColor: colors.surfaceElevated }]}>
+          <View style={styles.inspectorHeader}>
+            <Text style={[styles.inspectorYearTitle, { color: colors.textPrimary }]}>
+              Year {selectedData.year} ({selectedData.calendarYear}) Cross-Model Valuation
+            </Text>
+            <Text style={[styles.inspectorTotalVal, { color: colors.accent }]}>
+              5 Models Simulated
+            </Text>
+          </View>
+
+          <View style={styles.metricGrid}>
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#38BDF8' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Monte Carlo P50:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(displayedMedian[safeYearIndex] || 0, baseCountry)}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#F59E0B' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>2008 Backtest:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(displayedBacktest[safeYearIndex] || 0, baseCountry)}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#10B981' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Rolling Median:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(displayedRollingMedian[safeYearIndex] || 0, baseCountry)}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#EC4899' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Stress Shock:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(displayedStress[safeYearIndex] || 0, baseCountry)}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#8B5CF6' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Goals Net (GBWM):</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(displayedGoals[safeYearIndex] || 0, baseCountry)}
+              </Text>
+            </View>
+          </View>
         </View>
-
-        <View style={styles.metricGrid}>
-          <View style={styles.metricItem}>
-            <View style={[styles.metricDot, { backgroundColor: PALETTE.bucket1.base }]} />
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>B1 (Cash):</Text>
-            <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
-              {formatCurrency(selectedData.bucket1, baseCountry)}
+      ) : (
+        /* Standard 3-Bucket / Monte Carlo Inspector Card */
+        <View style={[styles.inspectorCard, { backgroundColor: colors.surfaceElevated }]}>
+          <View style={styles.inspectorHeader}>
+            <Text style={[styles.inspectorYearTitle, { color: colors.textPrimary }]}>
+              Year {selectedData.year} ({selectedData.calendarYear})
+            </Text>
+            <Text style={[styles.inspectorTotalVal, { color: colors.accent }]}>
+              Total: {formatCurrency(selectedData.totalCorpus, baseCountry)}
             </Text>
           </View>
 
-          <View style={styles.metricItem}>
-            <View style={[styles.metricDot, { backgroundColor: PALETTE.bucket2.base }]} />
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>B2 (Stable):</Text>
-            <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
-              {formatCurrency(selectedData.bucket2, baseCountry)}
+          <View style={styles.metricGrid}>
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: PALETTE.bucket1.base }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>B1 (Cash):</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(selectedData.bucket1, baseCountry)}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: PALETTE.bucket2.base }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>B2 (Stable):</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(selectedData.bucket2, baseCountry)}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: PALETTE.bucket3.base }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>B3 (Growth):</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(selectedData.bucket3, baseCountry)}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#F43F5E' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Withdrawal:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(selectedData.withdrawalAmount, baseCountry)}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Model Comparison Matrix Table (Rendered when in Comparison Mode) */}
+      {activeTab === 'comparison' && modelComparison && (
+        <View style={[styles.comparisonMatrixBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle }]}>
+          <View style={styles.matrixHeaderRow}>
+            <Scale size={16} color={colors.accent} style={{ marginRight: 6 }} />
+            <Text style={[styles.matrixTitle, { color: colors.textPrimary }]}>
+              Executive Comparison: Analytical Methods Matrix
             </Text>
           </View>
+          <Text style={[styles.matrixSubtitle, { color: colors.textMuted }]}>
+            How each methodology evaluates your portfolio under identical starting capital:
+          </Text>
 
-          <View style={styles.metricItem}>
-            <View style={[styles.metricDot, { backgroundColor: PALETTE.bucket3.base }]} />
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>B3 (Growth):</Text>
-            <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
-              {formatCurrency(selectedData.bucket3, baseCountry)}
-            </Text>
+          <View style={styles.modelCardsGrid}>
+            {modelComparison.models.map((m) => (
+              <View
+                key={m.id}
+                style={[
+                  styles.modelCardItem,
+                  {
+                    backgroundColor: colors.surfaceCard,
+                    borderColor: m.id === selectedModel ? m.color : colors.borderSubtle,
+                    borderLeftColor: m.color,
+                    borderLeftWidth: 4,
+                  },
+                ]}
+              >
+                <View style={styles.modelCardTop}>
+                  <Text style={[styles.modelCardName, { color: m.color }]}>{m.name}</Text>
+                  <View style={[styles.metricBadge, { backgroundColor: m.color + '20', borderColor: m.color }]}>
+                    <Text style={[styles.metricBadgeText, { color: m.color }]}>
+                      {m.keyMetricLabel}: {m.keyMetricValue}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.modelCardQuestion, { color: colors.textSecondary }]}>
+                  "{m.whatItAnswers}"
+                </Text>
+
+                <View style={styles.modelCardFooter}>
+                  <Text style={[styles.modelTerminalLabel, { color: colors.textMuted }]}>
+                    Terminal Corpus ({effectiveHorizon}Y):
+                  </Text>
+                  <Text style={[styles.modelTerminalVal, { color: colors.textPrimary }]}>
+                    {formatCurrency(m.terminalBalance, baseCountry)}
+                  </Text>
+                </View>
+
+                <Text style={[styles.modelCardBestFor, { color: colors.textMuted }]}>
+                  <Text style={{ fontWeight: '700', color: colors.textSecondary }}>Best Used For: </Text>
+                  {m.bestUsedFor}
+                </Text>
+              </View>
+            ))}
           </View>
 
-          <View style={styles.metricItem}>
-            <View style={[styles.metricDot, { backgroundColor: '#F43F5E' }]} />
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Withdrawal:</Text>
-            <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
-              {formatCurrency(selectedData.withdrawalAmount, baseCountry)}
+          {/* Institutional Takeaway Note */}
+          <View style={[styles.takeawayCard, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+            <Text style={[styles.takeawayHeading, { color: colors.accent }]}>
+              💡 Actuarial Synthesis
+            </Text>
+            <Text style={[styles.takeawayBody, { color: colors.textSecondary }]}>
+              {modelComparison.recommendation}
             </Text>
           </View>
         </View>
-
-        {/* Detailed Waterfall Rebalance & Defense Notifications */}
-        {selectedData.bucket1RefilledFromB2 > 0 ||
-        selectedData.bucket2RefilledFromB3 > 0 ||
-        selectedData.bearMarketDefenseActive ? (
-          <View style={styles.waterfallAudit}>
-            {selectedData.bucket1RefilledFromB2 > 0 ? (
-              <View style={styles.auditRow}>
-                <ArrowRightLeft size={13} color={PALETTE.bucket1.base} style={{ marginRight: 6 }} />
-                <Text style={[styles.auditText, { color: colors.textSecondary }]}>
-                  Waterfall Refill: Transferred{' '}
-                  <Text style={{ fontWeight: '700', color: colors.textPrimary }}>
-                    {formatCurrency(selectedData.bucket1RefilledFromB2, baseCountry)}
-                  </Text>{' '}
-                  from Bucket 2 to replenish Bucket 1 cash floor.
-                </Text>
-              </View>
-            ) : null}
-
-            {selectedData.bucket2RefilledFromB3 > 0 ? (
-              <View style={styles.auditRow}>
-                <ArrowRightLeft size={13} color={PALETTE.bucket3.base} style={{ marginRight: 6 }} />
-                <Text style={[styles.auditText, { color: colors.textSecondary }]}>
-                  Equity Harvesting: Harvested{' '}
-                  <Text style={{ fontWeight: '700', color: colors.textPrimary }}>
-                    {formatCurrency(selectedData.bucket2RefilledFromB3, baseCountry)}
-                  </Text>{' '}
-                  from Bucket 3 growth to reinforce Bucket 2 reserves.
-                </Text>
-              </View>
-            ) : null}
-
-            {selectedData.bearMarketDefenseActive ? (
-              <View style={styles.auditRow}>
-                <ShieldCheck size={14} color="#10B981" style={{ marginRight: 6 }} />
-                <Text style={[styles.auditText, { color: '#10B981', fontWeight: '600' }]}>
-                  Bear Market Defense Active: Equities in Bucket 3 were shielded from panic liquidation during drawdown.
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-      </View>
+      )}
     </View>
   );
 };
@@ -573,154 +1029,242 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     padding: 16,
-    marginVertical: 12,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    marginBottom: 20,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
     elevation: 4,
   },
   chartHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 10,
     flexWrap: 'wrap',
     gap: 8,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  subtitle: {
+    fontSize: 11,
+    marginTop: 2,
   },
   infoIconBtn: {
     padding: 4,
-    marginLeft: 6,
-  },
-  subtitle: {
-    fontSize: 12,
-    marginTop: 2,
+    marginLeft: 4,
   },
   chartHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  zoomToggle: {
-    flexDirection: 'row',
-    borderRadius: 8,
-    padding: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  zoomBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-  },
-  zoomBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
   },
   tabToggle: {
     flexDirection: 'row',
     borderRadius: 10,
     padding: 3,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   tabBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 7,
   },
   tabBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   svgWrapper: {
     alignItems: 'center',
-    marginVertical: 8,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  yearScrollContainer: {
+  legendContainer: {
     marginTop: 8,
+    marginBottom: 10,
+    alignItems: 'center',
   },
-  inspectPrompt: {
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    flexWrap: 'wrap',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  legendText: {
     fontSize: 11,
     fontWeight: '600',
-    marginBottom: 6,
+  },
+  yearRibbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  yearRibbonLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginRight: 8,
   },
   yearScroll: {
     flexDirection: 'row',
   },
   yearPill: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
     borderWidth: 1,
     marginRight: 6,
   },
   yearPillText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   inspectorCard: {
-    borderRadius: 14,
-    padding: 14,
-    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   inspectorHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    paddingBottom: 6,
   },
   inspectorYearTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
   },
   inspectorTotalVal: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
   },
   metricGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
+    justifyContent: 'space-between',
   },
   metricItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 120,
+    minWidth: '45%',
   },
   metricDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     marginRight: 6,
   },
   metricLabel: {
-    fontSize: 12,
+    fontSize: 11,
     marginRight: 4,
   },
   metricVal: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
-  waterfallAudit: {
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    gap: 6,
+  comparisonMatrixBox: {
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
   },
-  auditRow: {
+  matrixHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 4,
   },
-  auditText: {
+  matrixTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  matrixSubtitle: {
+    fontSize: 11,
+    marginBottom: 10,
+  },
+  modelCardsGrid: {
+    gap: 10,
+  },
+  modelCardItem: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  modelCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  modelCardName: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  metricBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  metricBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  modelCardQuestion: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginBottom: 6,
+  },
+  modelCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  modelTerminalLabel: {
+    fontSize: 11,
+  },
+  modelTerminalVal: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  modelCardBestFor: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  takeawayCard: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  takeawayHeading: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  takeawayBody: {
     fontSize: 11,
     lineHeight: 16,
-    flex: 1,
   },
 });

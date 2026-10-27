@@ -22,21 +22,38 @@ import {
   X,
   Check,
   ChevronDown,
+  ShieldAlert,
+  Activity,
+  Target,
+  Scale,
+  Zap,
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { DatePickerInput } from '../common/DatePickerInput';
-import { CrossBorderEquityAllocation, SimulationInputs } from '../../engine/types';
+import {
+  CrossBorderEquityAllocation,
+  SimulationInputs,
+  WealthModelType,
+  HistoricalCrisisType,
+  StressScenarioType,
+} from '../../engine/types';
 import { PALETTE } from '../../theme/colors';
 import { COUNTRY_METAS, SupportedCountry, formatCurrency } from '../../utils/currency';
 import { COUNTRY_PROFILES, calculateMultiAssetBlendedB3 } from '../../engine/historicalData';
 import { calculateInitialSplit } from '../../engine/simulationEngine';
 import { calculateSafeMonthlyWithdrawal } from '../../engine/safeWithdrawal';
+import {
+  HISTORICAL_CRISIS_DATA,
+  STRESS_SCENARIOS_DATA,
+} from '../../engine/wealthModelsEngine';
 
 interface InputSectionProps {
   inputs: SimulationInputs;
   onChangeInputs: (newInputs: SimulationInputs) => void;
   onSuggestSafeWithdrawal: () => void;
-  onOpenEducationModal: () => void;
+  onOpenEducationModal?: (
+    topic?: 'riskcone' | 'buckets' | 'waterfall' | 'swr' | 'methodologies'
+  ) => void;
 }
 
 const HORIZON_OPTIONS = [
@@ -358,6 +375,27 @@ export const InputSection: React.FC<InputSectionProps> = ({
     onChangeInputs({ ...inputs, multiCountryAllocations: list });
   };
 
+  const activeModel = inputs.selectedModel || 'monte_carlo';
+  const activeCrisis = inputs.historicalCrisis || '2008_gfc';
+  const activeRollingWindow = inputs.rollingWindowYears || 5;
+  const activeStressScenario = inputs.stressTestScenario || 'equity_crash_30_inflation_8';
+
+  const handleModelChange = (m: WealthModelType) => {
+    onChangeInputs({ ...inputs, selectedModel: m });
+  };
+
+  const handleCrisisChange = (c: HistoricalCrisisType) => {
+    onChangeInputs({ ...inputs, historicalCrisis: c });
+  };
+
+  const handleRollingWindowChange = (w: 3 | 5 | 10) => {
+    onChangeInputs({ ...inputs, rollingWindowYears: w });
+  };
+
+  const handleStressScenarioChange = (s: StressScenarioType) => {
+    onChangeInputs({ ...inputs, stressTestScenario: s });
+  };
+
   return (
     <View
       style={[
@@ -369,6 +407,332 @@ export const InputSection: React.FC<InputSectionProps> = ({
         },
       ]}
     >
+      {/* 0. Wealth Management & Analytical Model Choice Option */}
+      <View style={[styles.modelSelectionCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle }]}>
+        <View style={styles.modelHeaderRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Scale size={16} color={colors.accent} style={{ marginRight: 6 }} />
+            <Text style={[styles.barTitle, { color: colors.textPrimary }]}>
+              Analytical Model & Growth Engine:
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => onOpenEducationModal?.('methodologies')}
+            style={styles.infoIconBtn}
+            activeOpacity={0.7}
+          >
+            <HelpCircle size={15} color={colors.accent} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Model Chips Selector */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 6, paddingVertical: 4 }}
+        >
+          <TouchableOpacity
+            onPress={() => handleModelChange('monte_carlo')}
+            style={[
+              styles.modelChip,
+              {
+                backgroundColor: activeModel === 'monte_carlo' ? '#38BDF820' : colors.surfaceCard,
+                borderColor: activeModel === 'monte_carlo' ? '#38BDF8' : colors.borderSubtle,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.modelChipText,
+                { color: activeModel === 'monte_carlo' ? '#38BDF8' : colors.textPrimary },
+              ]}
+            >
+              🎲 Monte Carlo
+            </Text>
+            <Text style={[styles.modelChipSub, { color: activeModel === 'monte_carlo' ? '#38BDF8' : colors.textMuted }]}>
+              Risk Cone
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => handleModelChange('historical_backtest')}
+            style={[
+              styles.modelChip,
+              {
+                backgroundColor: activeModel === 'historical_backtest' ? '#F59E0B20' : colors.surfaceCard,
+                borderColor: activeModel === 'historical_backtest' ? '#F59E0B' : colors.borderSubtle,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.modelChipText,
+                { color: activeModel === 'historical_backtest' ? '#F59E0B' : colors.textPrimary },
+              ]}
+            >
+              📜 Historical Backtest
+            </Text>
+            <Text style={[styles.modelChipSub, { color: activeModel === 'historical_backtest' ? '#F59E0B' : colors.textMuted }]}>
+              Crisis Replay
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => handleModelChange('rolling_returns')}
+            style={[
+              styles.modelChip,
+              {
+                backgroundColor: activeModel === 'rolling_returns' ? '#10B98120' : colors.surfaceCard,
+                borderColor: activeModel === 'rolling_returns' ? '#10B981' : colors.borderSubtle,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.modelChipText,
+                { color: activeModel === 'rolling_returns' ? '#10B981' : colors.textPrimary },
+              ]}
+            >
+              🔄 Rolling Returns
+            </Text>
+            <Text style={[styles.modelChipSub, { color: activeModel === 'rolling_returns' ? '#10B981' : colors.textMuted }]}>
+              Horizon Consistency
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => handleModelChange('stress_testing')}
+            style={[
+              styles.modelChip,
+              {
+                backgroundColor: activeModel === 'stress_testing' ? '#EC489920' : colors.surfaceCard,
+                borderColor: activeModel === 'stress_testing' ? '#EC4899' : colors.borderSubtle,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.modelChipText,
+                { color: activeModel === 'stress_testing' ? '#EC4899' : colors.textPrimary },
+              ]}
+            >
+              ⚡ Stress Testing
+            </Text>
+            <Text style={[styles.modelChipSub, { color: activeModel === 'stress_testing' ? '#EC4899' : colors.textMuted }]}>
+              Macro Shocks
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => handleModelChange('goals_based')}
+            style={[
+              styles.modelChip,
+              {
+                backgroundColor: activeModel === 'goals_based' ? '#8B5CF620' : colors.surfaceCard,
+                borderColor: activeModel === 'goals_based' ? '#8B5CF6' : colors.borderSubtle,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.modelChipText,
+                { color: activeModel === 'goals_based' ? '#8B5CF6' : colors.textPrimary },
+              ]}
+            >
+              🎯 Goals-Based
+            </Text>
+            <Text style={[styles.modelChipSub, { color: activeModel === 'goals_based' ? '#8B5CF6' : colors.textMuted }]}>
+              GBWM Milestones
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => handleModelChange('comparison')}
+            style={[
+              styles.modelChip,
+              {
+                backgroundColor: activeModel === 'comparison' ? '#6366F125' : colors.surfaceCard,
+                borderColor: activeModel === 'comparison' ? '#6366F1' : colors.borderSubtle,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.modelChipText,
+                { color: activeModel === 'comparison' ? '#6366F1' : colors.textPrimary },
+              ]}
+            >
+              ⚖️ Compare All
+            </Text>
+            <Text style={[styles.modelChipSub, { color: activeModel === 'comparison' ? '#6366F1' : colors.textMuted }]}>
+              Multi-Model View
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Contextual Scenario Controls Based on Selected Model */}
+        {activeModel === 'historical_backtest' && (
+          <View style={[styles.scenarioSubBox, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+            <Text style={[styles.scenarioSubLabel, { color: colors.textSecondary }]}>
+              Select Crisis Market Cycle:
+            </Text>
+            <View style={styles.scenarioChipsRow}>
+              {(['2008_gfc', '2000_dotcom', '1973_stagflation', '2020_covid'] as HistoricalCrisisType[]).map((cKey) => {
+                const item = HISTORICAL_CRISIS_DATA[cKey];
+                const isCur = activeCrisis === cKey;
+                return (
+                  <TouchableOpacity
+                    key={cKey}
+                    onPress={() => handleCrisisChange(cKey)}
+                    style={[
+                      styles.scenarioChip,
+                      {
+                        backgroundColor: isCur ? '#F59E0B25' : colors.surfaceElevated,
+                        borderColor: isCur ? '#F59E0B' : colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.scenarioChipText, { color: isCur ? '#F59E0B' : colors.textPrimary }]}>
+                      {cKey === '2008_gfc'
+                        ? '2008 GFC'
+                        : cKey === '2000_dotcom'
+                        ? '2000 Dot-Com'
+                        : cKey === '1973_stagflation'
+                        ? '1973 Stagflation'
+                        : '2020 Covid / 2022'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={[styles.scenarioDescText, { color: colors.textMuted }]}>
+              {HISTORICAL_CRISIS_DATA[activeCrisis]?.description}
+            </Text>
+          </View>
+        )}
+
+        {activeModel === 'rolling_returns' && (
+          <View style={[styles.scenarioSubBox, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+            <Text style={[styles.scenarioSubLabel, { color: colors.textSecondary }]}>
+              Select Rolling Holding Block Window:
+            </Text>
+            <View style={styles.scenarioChipsRow}>
+              {([3, 5, 10] as (3 | 5 | 10)[]).map((win) => {
+                const isCur = activeRollingWindow === win;
+                return (
+                  <TouchableOpacity
+                    key={win}
+                    onPress={() => handleRollingWindowChange(win)}
+                    style={[
+                      styles.scenarioChip,
+                      {
+                        backgroundColor: isCur ? '#10B98125' : colors.surfaceElevated,
+                        borderColor: isCur ? '#10B981' : colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.scenarioChipText, { color: isCur ? '#10B981' : colors.textPrimary }]}>
+                      {win}-Year Holding Blocks {win === 5 ? '⭐' : ''}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={[styles.scenarioDescText, { color: colors.textMuted }]}>
+              Breaks down the timeline into overlapping {activeRollingWindow}-year windows to calculate the exact frequency of positive returns, worst-case, median, and best holding experience.
+            </Text>
+          </View>
+        )}
+
+        {activeModel === 'stress_testing' && (
+          <View style={[styles.scenarioSubBox, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+            <Text style={[styles.scenarioSubLabel, { color: colors.textSecondary }]}>
+              Select Macroeconomic Shock Scenario:
+            </Text>
+            <View style={styles.scenarioChipsRow}>
+              {(['equity_crash_30_inflation_8', 'stagflation_shock', 'dual_asset_selloff_2022', 'prolonged_bear_market'] as StressScenarioType[]).map((sKey) => {
+                const item = STRESS_SCENARIOS_DATA[sKey];
+                const isCur = activeStressScenario === sKey;
+                return (
+                  <TouchableOpacity
+                    key={sKey}
+                    onPress={() => handleStressScenarioChange(sKey)}
+                    style={[
+                      styles.scenarioChip,
+                      {
+                        backgroundColor: isCur ? '#EC489925' : colors.surfaceElevated,
+                        borderColor: isCur ? '#EC4899' : colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.scenarioChipText, { color: isCur ? '#EC4899' : colors.textPrimary }]}>
+                      {sKey === 'equity_crash_30_inflation_8'
+                        ? '8% Infl + -30% Crash'
+                        : sKey === 'stagflation_shock'
+                        ? '1970s Stagflation'
+                        : sKey === 'dual_asset_selloff_2022'
+                        ? '2022 Dual Sell-Off'
+                        : 'Lost Decade (10Y Flat)'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={[styles.scenarioDescText, { color: colors.textMuted }]}>
+              {STRESS_SCENARIOS_DATA[activeStressScenario]?.description}
+            </Text>
+          </View>
+        )}
+
+        {activeModel === 'goals_based' && (
+          <View style={[styles.scenarioSubBox, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+            <Text style={[styles.scenarioSubLabel, { color: colors.textSecondary }]}>
+              Goals-Based Wealth Management (GBWM) Milestone Allocation:
+            </Text>
+            <View style={{ gap: 6, marginVertical: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[styles.miniBucketTag, { backgroundColor: '#38BDF825', borderColor: '#38BDF8' }]}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#38BDF8' }}>Bucket 1 (1–3Y)</Text>
+                </View>
+                <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                  Immediate living liquidity & short-term safety cushion
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[styles.miniBucketTag, { backgroundColor: '#10B98125', borderColor: '#10B981' }]}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#10B981' }}>Bucket 2 (5–10Y)</Text>
+                </View>
+                <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                  Tuition, lifestyle upgrade, and intermediate milestones
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[styles.miniBucketTag, { backgroundColor: '#F59E0B25', borderColor: '#F59E0B' }]}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#F59E0B' }}>Bucket 3 (15+Y)</Text>
+                </View>
+                <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                  Aggressive compounding for retirement longevity & legacy transfer
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {activeModel === 'comparison' && (
+          <View style={[styles.scenarioSubBox, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Scale size={14} color="#6366F1" style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#6366F1' }}>
+                Multi-Model Cross Comparison Active
+              </Text>
+            </View>
+            <Text style={[styles.scenarioDescText, { color: colors.textMuted, marginTop: 4 }]}>
+              Simultaneously calculating Monte Carlo, Historical Backtest (2008), Rolling Returns, Stress Testing, and Goals-Based models. Inspect the comparison chart and table below.
+            </Text>
+          </View>
+        )}
+      </View>
+
       {/* 1. Country & Base Market Selector Bar */}
       <View style={styles.countryBar}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1831,4 +2195,76 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  modelSelectionCard: {
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  modelHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  infoIconBtn: {
+    padding: 4,
+    marginLeft: 4,
+  },
+  modelChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    minWidth: 100,
+  },
+  modelChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  modelChipSub: {
+    fontSize: 10,
+    marginTop: 1,
+    fontWeight: '600',
+  },
+  scenarioSubBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  scenarioSubLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  scenarioChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+  },
+  scenarioChip: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  scenarioChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  scenarioDescText: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontStyle: 'italic',
+  },
+  miniBucketTag: {
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
 });
+

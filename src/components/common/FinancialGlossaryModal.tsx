@@ -25,7 +25,7 @@ import { PALETTE } from '../../theme/colors';
 interface FinancialGlossaryModalProps {
   visible: boolean;
   onClose: () => void;
-  initialTopic?: 'buckets' | 'riskcone' | 'waterfall' | 'swr';
+  initialTopic?: 'riskcone' | 'buckets' | 'waterfall' | 'swr' | 'methodologies';
 }
 
 export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
@@ -34,9 +34,9 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
   initialTopic = 'riskcone',
 }) => {
   const { colors, theme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'riskcone' | 'buckets' | 'waterfall' | 'swr'>(
-    initialTopic
-  );
+  const [activeTab, setActiveTab] = useState<
+    'riskcone' | 'buckets' | 'waterfall' | 'swr' | 'methodologies'
+  >(initialTopic);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -157,6 +157,28 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
                   ]}
                 >
                   🛡️ Safe Withdrawal (SWR)
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setActiveTab('methodologies')}
+                style={[
+                  styles.tabChip,
+                  {
+                    backgroundColor:
+                      activeTab === 'methodologies' ? colors.accent : colors.surfaceElevated,
+                    borderColor:
+                      activeTab === 'methodologies' ? colors.accent : colors.borderSubtle,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabChipText,
+                    { color: activeTab === 'methodologies' ? '#FFFFFF' : colors.textPrimary },
+                  ]}
+                >
+                  ⚖️ Model Methodologies
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -482,6 +504,242 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
                     • It indexes monthly living expenses to your chosen annual inflation rate every year.{'\n'}
                     • It targets a minimum <Text style={{ fontWeight: '700', color: '#10B981' }}>95% survival probability</Text> over your customized Simulation Horizon (up to 80 years).{'\n'}
                     • This ensures your capital theoretically preserves purchasing power and eliminates longevity exhaustion risk.
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {activeTab === 'methodologies' && (
+              <View style={styles.topicBlock}>
+                {/* Executive Overview */}
+                <View
+                  style={[
+                    styles.executiveSummaryCard,
+                    {
+                      backgroundColor: colors.accent + '12',
+                      borderColor: colors.accent + '40',
+                    },
+                  ]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <TrendingUp size={16} color={colors.accent} style={{ marginRight: 6 }} />
+                    <Text style={[styles.executiveSummaryTitle, { color: colors.textPrimary }]}>
+                      Wealth Management & Asset Growth Methodologies
+                    </Text>
+                  </View>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 8 }]}>
+                    While Monte Carlo simulations (which generate risk cones) are excellent for viewing probabilistic futures, wealth managers and institutional investors rely on several other core methods to analyze asset growth and plan portfolios.
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                    These alternative methodologies focus on real-world history, deterministic stress testing, or structural life goals rather than random probability alone.
+                  </Text>
+                </View>
+
+                {/* Core Analytical Methods Comparison Table */}
+                <View
+                  style={[
+                    styles.cardItem,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+                  ]}
+                >
+                  <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+                    ⚖️ Analytical Methods: Core Comparison
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 10 }]}>
+                    How institutional wealth managers select and apply each analytical lens:
+                  </Text>
+
+                  <View style={[styles.tableContainer, { borderColor: colors.borderSubtle }]}>
+                    <View
+                      style={[
+                        styles.tableHeaderRow,
+                        {
+                          backgroundColor:
+                            theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                          borderBottomColor: colors.borderSubtle,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.tableHeaderCell, { flex: 1.1, color: colors.textMuted }]}>
+                        Method
+                      </Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.4, color: colors.textMuted }]}>
+                        What It Answers
+                      </Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.5, color: colors.textMuted }]}>
+                        Best Used For
+                      </Text>
+                    </View>
+
+                    {/* Row 1: Monte Carlo */}
+                    <View style={[styles.tableRow, { borderBottomColor: colors.borderSubtle }]}>
+                      <View style={{ flex: 1.1 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#38BDF8' }}>
+                          Monte Carlo (Risk Cone)
+                        </Text>
+                      </View>
+                      <Text style={[styles.tableCell, { flex: 1.4, color: colors.textSecondary }]}>
+                        "What are the statistical odds of my money lasting?"
+                      </Text>
+                      <Text style={[styles.tableCell, { flex: 1.5, color: colors.textPrimary }]}>
+                        Long-term retirement viability & sequence-of-returns bounds.
+                      </Text>
+                    </View>
+
+                    {/* Row 2: Historical Backtesting */}
+                    <View style={[styles.tableRow, { borderBottomColor: colors.borderSubtle }]}>
+                      <View style={{ flex: 1.1 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#F59E0B' }}>
+                          Historical Backtesting
+                        </Text>
+                      </View>
+                      <Text style={[styles.tableCell, { flex: 1.4, color: colors.textSecondary }]}>
+                        "How would this exact portfolio survive 2008?"
+                      </Text>
+                      <Text style={[styles.tableCell, { flex: 1.5, color: colors.textPrimary }]}>
+                        Strategy validation and reality checks against actual crashes.
+                      </Text>
+                    </View>
+
+                    {/* Row 3: Rolling Returns */}
+                    <View style={[styles.tableRow, { borderBottomColor: colors.borderSubtle }]}>
+                      <View style={{ flex: 1.1 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#10B981' }}>
+                          Rolling Returns
+                        </Text>
+                      </View>
+                      <Text style={[styles.tableCell, { flex: 1.4, color: colors.textSecondary }]}>
+                        "What is the typical experience of holding this for 5 years?"
+                      </Text>
+                      <Text style={[styles.tableCell, { flex: 1.5, color: colors.textPrimary }]}>
+                        Measuring consistency and volatility decay over holding blocks.
+                      </Text>
+                    </View>
+
+                    {/* Row 4: Stress Testing */}
+                    <View style={[styles.tableRow, { borderBottomColor: colors.borderSubtle }]}>
+                      <View style={{ flex: 1.1 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#EC4899' }}>
+                          Stress Testing
+                        </Text>
+                      </View>
+                      <Text style={[styles.tableCell, { flex: 1.4, color: colors.textSecondary }]}>
+                        "What happens if inflation doubles and stocks crash tomorrow?"
+                      </Text>
+                      <Text style={[styles.tableCell, { flex: 1.5, color: colors.textPrimary }]}>
+                        Finding structural holes & verifying cash/debt buffer adequacy.
+                      </Text>
+                    </View>
+
+                    {/* Row 5: Goals-Based Planning */}
+                    <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
+                      <View style={{ flex: 1.1 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#8B5CF6' }}>
+                          Goals-Based (GBWM)
+                        </Text>
+                      </View>
+                      <Text style={[styles.tableCell, { flex: 1.4, color: colors.textSecondary }]}>
+                        "Am I on track to pay for college and retire smoothly?"
+                      </Text>
+                      <Text style={[styles.tableCell, { flex: 1.5, color: colors.textPrimary }]}>
+                        Personal financial alignment, milestone earmarking & behavioral discipline.
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* In-depth 1: Historical Backtesting */}
+                <View
+                  style={[
+                    styles.cardItem,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+                  ]}
+                >
+                  <Text style={[styles.cardTitle, { color: '#F59E0B' }]}>
+                    1. Historical Backtesting
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                    Instead of simulating randomized future paths, backtesting applies your current asset allocation strategy directly to real historical market data.
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                    <Text style={{ fontWeight: '700', color: colors.textPrimary }}>How it works: </Text>
+                    You "wind back the clock" to a specific date (e.g. Jan 1, 2000 or Jan 1, 2008) and track how your 3-bucket portfolio would have survived through the Dot-Com crash, the 2008 Financial Crisis, or 1970s Stagflation.
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                    <Text style={{ fontWeight: '700', color: '#10B981' }}>Key Benefit: </Text>
+                    Grounds your retirement plan in actual lived history rather than theoretical equations, exposing how your cash buffer prevents distress selling at market bottoms.
+                  </Text>
+                </View>
+
+                {/* In-depth 2: Rolling Returns Analysis */}
+                <View
+                  style={[
+                    styles.cardItem,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+                  ]}
+                >
+                  <Text style={[styles.cardTitle, { color: '#10B981' }]}>
+                    2. Rolling Returns Analysis
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                    A major flaw in standard point-to-point growth calculations is "sequence of returns risk" (the luck of the calendar year when you start). Rolling returns break down an investment timeline into overlapping blocks to eliminate this bias.
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                    <Text style={{ fontWeight: '700', color: colors.textPrimary }}>How it works: </Text>
+                    If you have 20 years of market data, a rolling 5-year analysis computes returns from Year 1–5, Year 2–6, Year 3–7, and so on.
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                    <Text style={{ fontWeight: '700', color: '#10B981' }}>Key Benefit: </Text>
+                    Reveals the frequency and statistical probability of achieving positive growth over a holding horizon, showing you the absolute worst, median, and best outcomes experienced historically.
+                  </Text>
+                </View>
+
+                {/* In-depth 3: Deterministic Stress Testing */}
+                <View
+                  style={[
+                    styles.cardItem,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+                  ]}
+                >
+                  <Text style={[styles.cardTitle, { color: '#EC4899' }]}>
+                    3. Deterministic Stress Testing (Scenario Analysis)
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                    Unlike Monte Carlo's abstract percentage bands, deterministic stress testing models how a portfolio handles specific, hardcoded macroeconomic shocks.
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                    <Text style={{ fontWeight: '700', color: colors.textPrimary }}>How it works: </Text>
+                    Institutions hardcode parameters to simulate acute crises, e.g.: "What happens if inflation spikes to 8% and equities plunge 30% simultaneously?" or "How will this wealth cope with 1970s-style stagflation?"
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                    <Text style={{ fontWeight: '700', color: '#10B981' }}>Key Benefit: </Text>
+                    Helps investors identify structural vulnerabilities, proving whether Bucket 1 cash and Bucket 2 debt buffers are sufficient to weather macroeconomic shocks.
+                  </Text>
+                </View>
+
+                {/* In-depth 4: Goals-Based Wealth Management */}
+                <View
+                  style={[
+                    styles.cardItem,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+                  ]}
+                >
+                  <Text style={[styles.cardTitle, { color: '#8B5CF6' }]}>
+                    4. Goals-Based Wealth Management (GBWM)
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                    Rather than focusing purely on maximizing return percentages or beating a market benchmark, Goals-Based Wealth Management structures your assets entirely around specific life milestones.
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                    <Text style={{ fontWeight: '700', color: colors.textPrimary }}>How it works: </Text>
+                    Your wealth is segmented into different "buckets," each matched to a distinct timeframe:
+                    {'\n'}• <Text style={{ fontWeight: '700', color: '#38BDF8' }}>Short-Term (1–3 years):</Text> High liquidity, ultra-low risk cash for living expenses and immediate needs.
+                    {'\n'}• <Text style={{ fontWeight: '700', color: '#10B981' }}>Medium-Term (5–10 years):</Text> Moderate risk fixed income for college tuition and lifestyle upgrades.
+                    {'\n'}• <Text style={{ fontWeight: '700', color: '#F59E0B' }}>Long-Term (15+ years):</Text> Aggressive growth equities for multi-generational wealth and lifelong retirement longevity.
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                    <Text style={{ fontWeight: '700', color: '#10B981' }}>Key Benefit: </Text>
+                    Prevents emotional panic during market downturns because you know your immediate cash needs and near-term milestones are insulated from volatile growth buckets.
                   </Text>
                 </View>
               </View>
