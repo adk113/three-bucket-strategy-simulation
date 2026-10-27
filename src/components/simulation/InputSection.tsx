@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
   Settings2,
   X,
   Check,
+  ChevronDown,
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { DatePickerInput } from '../common/DatePickerInput';
@@ -29,6 +30,7 @@ import { PALETTE } from '../../theme/colors';
 import { COUNTRY_METAS, SupportedCountry, formatCurrency } from '../../utils/currency';
 import { COUNTRY_PROFILES, calculateMultiAssetBlendedB3 } from '../../engine/historicalData';
 import { calculateInitialSplit } from '../../engine/simulationEngine';
+import { calculateSafeMonthlyWithdrawal } from '../../engine/safeWithdrawal';
 
 interface InputSectionProps {
   inputs: SimulationInputs;
@@ -60,8 +62,80 @@ export const InputSection: React.FC<InputSectionProps> = ({
   const country = inputs.baseCountry || 'IN';
   const meta = COUNTRY_METAS[country] || COUNTRY_METAS.IN;
 
-  // Unified Horizon picker state (Simulate + Visualize in lockstep)
+  // Modals for Unified Horizon, Corpus, Withdrawal, and Inflation dropdowns
   const [isHorizonModalOpen, setIsHorizonModalOpen] = useState(false);
+  const [isCorpusModalOpen, setIsCorpusModalOpen] = useState(false);
+  const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
+  const [isInflationModalOpen, setIsInflationModalOpen] = useState(false);
+
+  // Dynamic Safe Monthly Withdrawal Benchmark & Range (±5k to ±25k)
+  const dynamicSafeBenchmark = useMemo(() => {
+    return calculateSafeMonthlyWithdrawal(inputs);
+  }, [inputs]);
+
+  const withdrawalRangeOptions = useMemo(() => {
+    const isIndia = (inputs.baseCountry || 'IN') === 'IN';
+    const minFloor = isIndia ? 5000 : 500;
+    const offsets = [-25000, -20000, -15000, -10000, -5000, 0, 5000, 10000, 15000, 20000, 25000];
+    const base = dynamicSafeBenchmark;
+
+    return offsets
+      .map((delta) => {
+        const val = Math.max(minFloor, base + delta);
+        const deltaLabel =
+          delta === 0
+            ? '⭐ Suggested Safe Benchmark'
+            : delta < 0
+            ? `${delta / 1000}K (Conservative buffer)`
+            : `+${delta / 1000}K (Elevated draw)`;
+        return {
+          delta,
+          value: val,
+          label: formatCurrency(val, country),
+          desc: `${deltaLabel} • Annual: ${formatCurrency(val * 12, country)}`,
+        };
+      })
+      .filter((opt, idx, arr) => arr.findIndex((x) => x.value === opt.value) === idx);
+  }, [dynamicSafeBenchmark, inputs.baseCountry, country]);
+
+  // Initial Retirement Corpus Dropdown Options (50 L to 10 Cr with 50 L intervals)
+  const corpusDropdownOptions = useMemo(() => {
+    const list = [];
+    // 50 Lakhs (5,000,000) to 10 Crore (100,000,000) in steps of 50 Lakhs (5,000,000)
+    for (let c = 5000000; c <= 100000000; c += 5000000) {
+      const crVal = c / 10000000;
+      const label =
+        c < 10000000
+          ? `${c / 100000} Lakhs (${crVal.toFixed(2)} Cr)`
+          : `${crVal.toFixed(1)} Crore`;
+      list.push({
+        value: c,
+        label,
+        formatted: formatCurrency(c, country),
+      });
+    }
+    return list;
+  }, [country]);
+
+  // Expected Inflation Dropdown Options (0% to 10%)
+  const inflationDropdownOptions = useMemo(() => {
+    const list = [];
+    for (let i = 0; i <= 10; i++) {
+      list.push({
+        value: i,
+        label: `${i}%`,
+        desc:
+          i === 0
+            ? '0% Inflation (Nominal = Real)'
+            : i === 6
+            ? '6.0% (India Historical Benchmark)'
+            : i === 3
+            ? '3.0% (Developed Market Benchmark)'
+            : `${i}% Annual Inflation`,
+      });
+    }
+    return list;
+  }, []);
 
   const handleSelectUnifiedHorizon = (years: number) => {
     onChangeInputs({
@@ -70,6 +144,30 @@ export const InputSection: React.FC<InputSectionProps> = ({
       displayHorizon: years,
     });
     setIsHorizonModalOpen(false);
+  };
+
+  const handleSelectCorpus = (corpusVal: number) => {
+    onChangeInputs({
+      ...inputs,
+      initialCorpus: corpusVal,
+    });
+    setIsCorpusModalOpen(false);
+  };
+
+  const handleSelectWithdrawal = (withdrawalVal: number) => {
+    onChangeInputs({
+      ...inputs,
+      monthlyWithdrawal: withdrawalVal,
+    });
+    setIsWithdrawalModalOpen(false);
+  };
+
+  const handleSelectInflation = (inflationVal: number) => {
+    onChangeInputs({
+      ...inputs,
+      inflationRate: inflationVal,
+    });
+    setIsInflationModalOpen(false);
   };
 
   const handleCorpusChange = (text: string) => {
@@ -317,9 +415,25 @@ export const InputSection: React.FC<InputSectionProps> = ({
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
             Initial Retirement Corpus ({meta.currencyCode})
           </Text>
-          <Text style={[styles.badgeText, { color: colors.accent }]}>
-            {formatCurrency(inputs.initialCorpus, country)}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              onPress={() => setIsCorpusModalOpen(true)}
+              style={[
+                styles.fieldDropdownBtn,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.fieldDropdownBtnText, { color: colors.accent }]}>
+                {inputs.initialCorpus >= 10000000
+                  ? `${(inputs.initialCorpus / 10000000).toFixed(1)} Cr ▾`
+                  : `${(inputs.initialCorpus / 100000).toFixed(0)} L ▾`}
+              </Text>
+            </TouchableOpacity>
+            <Text style={[styles.badgeText, { color: colors.accent }]}>
+              {formatCurrency(inputs.initialCorpus, country)}
+            </Text>
+          </View>
         </View>
 
         <View
@@ -339,18 +453,41 @@ export const InputSection: React.FC<InputSectionProps> = ({
             placeholder="e.g. 20000000"
             placeholderTextColor={colors.textMuted}
           />
+          <TouchableOpacity
+            style={[styles.inlineDropdownTrigger, { backgroundColor: colors.surfaceElevated }]}
+            onPress={() => setIsCorpusModalOpen(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.inlineDropdownText, { color: colors.accent }]}>
+              50L - 10Cr ▾
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Expected Monthly Withdrawal + Suggest Safe Button */}
+      {/* Expected Monthly Withdrawal + Suggest Safe Button + Dynamic Range Dropdown */}
       <View style={styles.fieldBlock}>
         <View style={styles.labelRow}>
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
             Expected Monthly Withdrawal ({meta.currencyCode})
           </Text>
-          <Text style={[styles.badgeText, { color: colors.textMuted }]}>
-            Annual: {formatCurrency(inputs.monthlyWithdrawal * 12, country)}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              onPress={() => setIsWithdrawalModalOpen(true)}
+              style={[
+                styles.fieldDropdownBtn,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.fieldDropdownBtnText, { color: colors.accent }]}>
+                Safe Range (±25k) ▾
+              </Text>
+            </TouchableOpacity>
+            <Text style={[styles.badgeText, { color: colors.textMuted }]}>
+              Annual: {formatCurrency(inputs.monthlyWithdrawal * 12, country)}
+            </Text>
+          </View>
         </View>
 
         <View
@@ -370,6 +507,16 @@ export const InputSection: React.FC<InputSectionProps> = ({
             placeholder="e.g. 60000"
             placeholderTextColor={colors.textMuted}
           />
+
+          <TouchableOpacity
+            style={[styles.inlineDropdownTrigger, { backgroundColor: colors.surfaceElevated, marginRight: 6 }]}
+            onPress={() => setIsWithdrawalModalOpen(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.inlineDropdownText, { color: colors.accent }]}>
+              ±25k ▾
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.suggestBtn, { backgroundColor: colors.accent }]}
@@ -393,9 +540,23 @@ export const InputSection: React.FC<InputSectionProps> = ({
         </View>
 
         <View style={{ flex: 1, marginLeft: 8 }}>
-          <Text style={[styles.fieldLabel, { color: colors.textSecondary, marginBottom: 6 }]}>
-            Expected Inflation (%)
-          </Text>
+          <View style={styles.labelRowSub}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
+              Expected Inflation (%)
+            </Text>
+            <TouchableOpacity
+              onPress={() => setIsInflationModalOpen(true)}
+              style={[
+                styles.tinyDropdownBtn,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tinyDropdownBtnText, { color: colors.accent }]}>
+                0-10% ▾
+              </Text>
+            </TouchableOpacity>
+          </View>
           <View
             style={[
               styles.inputRow,
@@ -410,7 +571,15 @@ export const InputSection: React.FC<InputSectionProps> = ({
               placeholder={meta.defaultInflation.toString()}
               placeholderTextColor={colors.textMuted}
             />
-            <Text style={{ color: colors.textMuted, fontWeight: '700' }}>%</Text>
+            <TouchableOpacity
+              onPress={() => setIsInflationModalOpen(true)}
+              style={styles.percentDropdownToggle}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.percentDropdownText, { color: colors.accent }]}>
+                % ▾
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -882,6 +1051,261 @@ export const InputSection: React.FC<InputSectionProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* 2. Initial Retirement Corpus Selection Modal (50 L to 10 Cr in 50 L intervals) */}
+      <Modal
+        visible={isCorpusModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCorpusModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: colors.surfaceCard,
+                borderColor: colors.border,
+                shadowColor: colors.cardShadow,
+              },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+                  Select Initial Corpus
+                </Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
+                  Choose from 50 Lakhs to 10 Crore (50L increments) or enter custom amount
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsCorpusModalOpen(false)}
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceElevated }]}
+              >
+                <X size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+              {corpusDropdownOptions.map((opt) => {
+                const isSelected = inputs.initialCorpus === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    onPress={() => handleSelectCorpus(opt.value)}
+                    style={[
+                      styles.horizonOptionItem,
+                      {
+                        backgroundColor: isSelected ? colors.accent + '15' : colors.surfaceElevated,
+                        borderColor: isSelected ? colors.accent : colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    <View>
+                      <Text
+                        style={[
+                          styles.horizonOptionTitle,
+                          { color: isSelected ? colors.accent : colors.textPrimary },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                      <Text style={[styles.horizonOptionDesc, { color: colors.textMuted }]}>
+                        {opt.formatted}
+                      </Text>
+                    </View>
+                    {isSelected ? <Check size={18} color={colors.accent} /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setIsCorpusModalOpen(false)}
+              style={[styles.modalCancelBtn, { backgroundColor: colors.surfaceElevated }]}
+            >
+              <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 3. Expected Monthly Withdrawal Dynamic Safe Range Modal (±5k to ±25k) */}
+      <Modal
+        visible={isWithdrawalModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsWithdrawalModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: colors.surfaceCard,
+                borderColor: colors.border,
+                shadowColor: colors.cardShadow,
+              },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+                  Expected Monthly Withdrawal
+                </Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
+                  Dynamic safe benchmark: {formatCurrency(dynamicSafeBenchmark, country)}/mo (±5k to ±25k range)
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsWithdrawalModalOpen(false)}
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceElevated }]}
+              >
+                <X size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+              {withdrawalRangeOptions.map((opt) => {
+                const isSelected = inputs.monthlyWithdrawal === opt.value;
+                const isBenchmark = opt.delta === 0;
+
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    onPress={() => handleSelectWithdrawal(opt.value)}
+                    style={[
+                      styles.horizonOptionItem,
+                      {
+                        backgroundColor: isSelected
+                          ? colors.accent + '20'
+                          : isBenchmark
+                          ? '#10B98115'
+                          : colors.surfaceElevated,
+                        borderColor: isSelected
+                          ? colors.accent
+                          : isBenchmark
+                          ? '#10B98160'
+                          : colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    <View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text
+                          style={[
+                            styles.horizonOptionTitle,
+                            { color: isSelected ? colors.accent : colors.textPrimary },
+                          ]}
+                        >
+                          {opt.label}/mo
+                        </Text>
+                        {isBenchmark ? (
+                          <View style={{ backgroundColor: '#10B98125', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>RECOMMENDED</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={[styles.horizonOptionDesc, { color: colors.textMuted }]}>
+                        {opt.desc}
+                      </Text>
+                    </View>
+                    {isSelected ? <Check size={18} color={colors.accent} /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setIsWithdrawalModalOpen(false)}
+              style={[styles.modalCancelBtn, { backgroundColor: colors.surfaceElevated }]}
+            >
+              <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 4. Expected Inflation Dropdown Modal (0% to 10%) */}
+      <Modal
+        visible={isInflationModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsInflationModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: colors.surfaceCard,
+                borderColor: colors.border,
+                shadowColor: colors.cardShadow,
+              },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+                  Select Expected Inflation
+                </Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
+                  Choose from 0% to 10% annual inflation, or enter any decimal manually
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsInflationModalOpen(false)}
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceElevated }]}
+              >
+                <X size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+              {inflationDropdownOptions.map((opt) => {
+                const isSelected = inputs.inflationRate === opt.value;
+
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    onPress={() => handleSelectInflation(opt.value)}
+                    style={[
+                      styles.horizonOptionItem,
+                      {
+                        backgroundColor: isSelected ? colors.accent + '15' : colors.surfaceElevated,
+                        borderColor: isSelected ? colors.accent : colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    <View>
+                      <Text
+                        style={[
+                          styles.horizonOptionTitle,
+                          { color: isSelected ? colors.accent : colors.textPrimary },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                      <Text style={[styles.horizonOptionDesc, { color: colors.textMuted }]}>
+                        {opt.desc}
+                      </Text>
+                    </View>
+                    {isSelected ? <Check size={18} color={colors.accent} /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setIsInflationModalOpen(false)}
+              style={[styles.modalCancelBtn, { backgroundColor: colors.surfaceElevated }]}
+            >
+              <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -896,6 +1320,50 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 4,
+  },
+  fieldDropdownBtn: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  fieldDropdownBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  inlineDropdownTrigger: {
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginLeft: 6,
+  },
+  inlineDropdownText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  labelRowSub: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  tinyDropdownBtn: {
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  tinyDropdownBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  percentDropdownToggle: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  percentDropdownText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   countryBar: {
     flexDirection: 'row',

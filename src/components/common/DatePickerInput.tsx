@@ -179,7 +179,7 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
         <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
       ) : null}
 
-      {/* Main Interactive Trigger (Tapping anywhere opens the Calendar Popup) */}
+      {/* Main Interactive Trigger: Clean date on left, standalone Calendar icon on right */}
       <TouchableOpacity
         style={[
           styles.triggerBtn,
@@ -191,34 +191,17 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
         onPress={openPicker}
         activeOpacity={0.7}
       >
-        <View style={styles.triggerLeft}>
-          <View
-            style={[
-              styles.calendarIconBubble,
-              { backgroundColor: colors.accent + '18' },
-            ]}
-          >
-            <Calendar size={17} color={colors.accent} />
-          </View>
-          <View style={styles.dateTextGroup}>
-            <Text style={[styles.mainDateText, { color: colors.textPrimary }]}>
-              {value || '01/01/2026'}
-            </Text>
-            <Text style={[styles.subDateText, { color: colors.textMuted }]}>
-              ({friendlyLabel})
-            </Text>
-          </View>
-        </View>
+        <Text style={[styles.mainDateText, { color: colors.textPrimary }]}>
+          {value || '01/01/2026'}
+        </Text>
 
         <View
           style={[
-            styles.pickBadge,
-            { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+            styles.calendarIconButton,
+            { backgroundColor: colors.accent + '18', borderColor: colors.accent + '35' },
           ]}
         >
-          <Text style={[styles.pickBadgeText, { color: colors.accent }]}>
-            Calendar ▾
-          </Text>
+          <Calendar size={16} color={colors.accent} />
         </View>
       </TouchableOpacity>
 
@@ -633,42 +616,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 48,
   },
-  triggerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  calendarIconBubble: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  dateTextGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
   mainDateText: {
     fontSize: 14,
     fontWeight: '700',
     fontFamily: 'System',
+    letterSpacing: 0.3,
   },
-  subDateText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  pickBadge: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+  calendarIconButton: {
+    width: 32,
+    height: 32,
     borderRadius: 8,
     borderWidth: 1,
-  },
-  pickBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalOverlay: {
     flex: 1,
