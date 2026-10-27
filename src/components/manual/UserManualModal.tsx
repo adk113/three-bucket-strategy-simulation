@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,7 +27,9 @@ import {
   HelpCircle,
   Maximize2,
   Minimize2,
+  ExternalLink,
 } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { useTheme } from '../../theme/ThemeContext';
 import {
   USER_MANUAL_SECTIONS,
@@ -84,8 +86,15 @@ export const UserManualModal: React.FC<UserManualModalProps> = ({
 
   const [activeCategory, setActiveCategory] = useState<string>(initialCategory);
   const [searchQuery, setSearchQuery] = useState<string>(initialSearchQuery);
-  const [expandedSubsections, setExpandedSubsections] = useState<Record<string, boolean>>({
-    philosophy_core_concept: true, // Default first subsection open
+  // Default expanded subsections: open the first subsection of each section so content is immediately readable
+  const [expandedSubsections, setExpandedSubsections] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    USER_MANUAL_SECTIONS.forEach((sec) => {
+      if (sec.subsections.length > 0) {
+        initial[sec.subsections[0].id] = true;
+      }
+    });
+    return initial;
   });
 
   const toggleSubsection = (id: string) => {
@@ -107,6 +116,20 @@ export const UserManualModal: React.FC<UserManualModalProps> = ({
 
   const collapseAll = () => {
     setExpandedSubsections({});
+  };
+
+  const handleSelectCategory = (catId: string) => {
+    setActiveCategory(catId);
+    // When switching categories, automatically expand the subsections of that category
+    const updated: Record<string, boolean> = { ...expandedSubsections };
+    USER_MANUAL_SECTIONS.forEach((sec) => {
+      if (catId === 'all' || sec.category === catId) {
+        sec.subsections.forEach((sub) => {
+          updated[sub.id] = true;
+        });
+      }
+    });
+    setExpandedSubsections(updated);
   };
 
   // Filter sections and subsections based on active category and search query
@@ -141,6 +164,19 @@ export const UserManualModal: React.FC<UserManualModalProps> = ({
     }).filter(Boolean) as ManualSection[];
   }, [activeCategory, searchQuery]);
 
+  // Auto-expand all matching subsections when user is searching
+  useEffect(() => {
+    if (searchQuery.trim().length > 0) {
+      const allMatching: Record<string, boolean> = {};
+      filteredSections.forEach((sec) => {
+        sec.subsections.forEach((sub) => {
+          allMatching[sub.id] = true;
+        });
+      });
+      setExpandedSubsections(allMatching);
+    }
+  }, [searchQuery, filteredSections]);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
@@ -150,19 +186,47 @@ export const UserManualModal: React.FC<UserManualModalProps> = ({
             {
               backgroundColor: colors.surfaceCard,
               borderColor: colors.border,
-              width: isCompact ? '96%' : Math.min(windowWidth - 40, 860),
-              maxHeight: isLandscape ? '95%' : '90%',
+              width: isCompact ? '96%' : Math.min(windowWidth - 32, 880),
+              // Explicit fixed height so Yoga gives ScrollView full remaining vertical space
+              height: isLandscape
+                ? Math.min(windowHeight * 0.96, 420)
+                : (isCompact ? '92%' : Math.min(windowHeight * 0.88, 780)),
             },
           ]}
         >
           {/* Header */}
-          <View style={[styles.headerRow, { borderBottomColor: colors.borderSubtle }]}>
+          <View
+            style={[
+              styles.headerRow,
+              {
+                borderBottomColor: colors.borderSubtle,
+                paddingVertical: isLandscape ? 8 : 14,
+              },
+            ]}
+          >
             <View style={styles.headerTitleWrap}>
-              <View style={[styles.headerIconBadge, { backgroundColor: colors.accent + '20' }]}>
-                <BookOpen size={20} color={colors.accent} />
+              <View
+                style={[
+                  styles.headerIconBadge,
+                  {
+                    backgroundColor: colors.accent + '20',
+                    width: isLandscape ? 30 : 38,
+                    height: isLandscape ? 30 : 38,
+                  },
+                ]}
+              >
+                <BookOpen size={isLandscape ? 16 : 20} color={colors.accent} />
               </View>
-              <View>
-                <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    styles.headerTitle,
+                    {
+                      color: colors.textPrimary,
+                      fontSize: isLandscape ? 14 : 16,
+                    },
+                  ]}
+                >
                   3-Bucket In-App User Manual
                 </Text>
                 <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
@@ -171,29 +235,54 @@ export const UserManualModal: React.FC<UserManualModalProps> = ({
               </View>
             </View>
 
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.closeButton, { backgroundColor: colors.surfaceElevated }]}
-              activeOpacity={0.7}
-            >
-              <X size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {/* Fullscreen Dedicated Page Button */}
+              <TouchableOpacity
+                onPress={() => {
+                  onClose();
+                  router.push('/manual');
+                }}
+                style={[styles.headerActionBtn, { backgroundColor: colors.surfaceElevated }]}
+                activeOpacity={0.7}
+                accessibilityLabel="Open Full Screen Manual"
+              >
+                <ExternalLink size={15} color={colors.accent} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.closeButton, { backgroundColor: colors.surfaceElevated }]}
+                activeOpacity={0.7}
+                accessibilityLabel="Close Manual Modal"
+              >
+                <X size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Search Bar & Global Accordion Controls */}
-          <View style={styles.searchAndControlsWrap}>
+          <View
+            style={[
+              styles.searchAndControlsWrap,
+              {
+                paddingTop: isLandscape ? 6 : 12,
+                paddingBottom: isLandscape ? 4 : 6,
+              },
+            ]}
+          >
             <View
               style={[
                 styles.searchBar,
                 {
                   backgroundColor: colors.inputBg,
                   borderColor: colors.inputBorder,
+                  height: isLandscape ? 34 : 40,
                 },
               ]}
             >
-              <Search size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
+              <Search size={15} color={colors.textMuted} style={{ marginRight: 8 }} />
               <TextInput
-                style={[styles.searchInput, { color: colors.textPrimary }]}
+                style={[styles.searchInput, { color: colors.textPrimary, fontSize: isLandscape ? 12 : 13 }]}
                 placeholder="Search manual (e.g. SWR, Bear Defense, P10, Waterfall)..."
                 placeholderTextColor={colors.textMuted}
                 value={searchQuery}
@@ -207,7 +296,7 @@ export const UserManualModal: React.FC<UserManualModalProps> = ({
               )}
             </View>
 
-            <View style={styles.accordionControlsRow}>
+            <View style={[styles.accordionControlsRow, { marginTop: isLandscape ? 4 : 6 }]}>
               <TouchableOpacity onPress={expandAll} style={styles.toggleTextBtn}>
                 <Maximize2 size={12} color={colors.accent} style={{ marginRight: 4 }} />
                 <Text style={[styles.toggleTextBtnLabel, { color: colors.accent }]}>Expand All</Text>
@@ -221,19 +310,21 @@ export const UserManualModal: React.FC<UserManualModalProps> = ({
           </View>
 
           {/* Category Filter Pills */}
-          <View style={styles.categoriesBarWrap}>
+          <View style={[styles.categoriesBarWrap, { paddingVertical: isLandscape ? 4 : 6 }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContent}>
               {USER_MANUAL_CATEGORIES.map((cat) => {
                 const isActive = activeCategory === cat.id;
                 return (
                   <TouchableOpacity
                     key={cat.id}
-                    onPress={() => setActiveCategory(cat.id)}
+                    onPress={() => handleSelectCategory(cat.id)}
                     style={[
                       styles.categoryChip,
                       {
                         backgroundColor: isActive ? colors.accent : colors.surfaceElevated,
                         borderColor: isActive ? colors.accent : colors.borderSubtle,
+                        paddingVertical: isLandscape ? 4 : 6,
+                        paddingHorizontal: isLandscape ? 10 : 12,
                       },
                     ]}
                     activeOpacity={0.7}
@@ -478,11 +569,11 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   headerRow: {
+    flexShrink: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 14,
     borderBottomWidth: 1,
   },
   headerTitleWrap: {
@@ -508,6 +599,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 1,
   },
+  headerActionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   closeButton: {
     width: 32,
     height: 32,
@@ -516,9 +614,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchAndControlsWrap: {
+    flexShrink: 0,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
   },
   searchBar: {
     flexDirection: 'row',
@@ -551,7 +648,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   categoriesBarWrap: {
-    paddingVertical: 6,
+    flexShrink: 0,
     borderBottomWidth: 0.5,
     borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
@@ -560,8 +657,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   categoryChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
   },
@@ -571,6 +666,7 @@ const styles = StyleSheet.create({
   },
   contentScrollView: {
     flex: 1,
+    minHeight: 140,
   },
   contentScrollInner: {
     padding: 16,
@@ -768,11 +864,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   footerBar: {
+    flexShrink: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderTopWidth: 1,
   },
   footerVersionText: {
