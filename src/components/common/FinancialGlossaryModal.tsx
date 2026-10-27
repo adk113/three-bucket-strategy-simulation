@@ -648,7 +648,57 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
                   </View>
                 </View>
 
-                {/* In-depth 1: Historical Backtesting */}
+                {/* In-depth 1: Monte Carlo Simulation (Risk Cone) */}
+                <View
+                  style={[
+                    styles.cardItem,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle },
+                  ]}
+                >
+                  <Text style={[styles.cardTitle, { color: '#38BDF8' }]}>
+                    1. Monte Carlo Stochastic Simulation (Risk Cone)
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                    Rather than predicting a single deterministic future, Monte Carlo generates 500 parallel economic timelines using random normal variance draws to capture market volatility.
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                    <Text style={{ fontWeight: '700', color: colors.textPrimary }}>How it works: </Text>
+                    For each year in your horizon, the engine draws random returns for cash, fixed income, and equities based on historical means (μ) and standard deviations (σ), factoring in cross-asset correlations and multi-country diversification.
+                  </Text>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 10 }]}>
+                    <Text style={{ fontWeight: '700', color: '#10B981' }}>Key Benefit: </Text>
+                    Produces a probabilistic "Risk Cone" showing the growing spread of future wealth over time, establishing confidence intervals for retirement viability.
+                  </Text>
+
+                  {/* Specific Terms Under Monte Carlo */}
+                  <View style={[styles.subContextCard, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+                    <Text style={[styles.subContextTitle, { color: '#38BDF8', marginBottom: 6 }]}>
+                      📚 Specific Terms Explained Under This Model:
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Stochastic vs. Deterministic Modeling: </Text>
+                      A deterministic model assumes constant returns (e.g. exactly 10% every year). A stochastic model incorporates real-world randomness, proving how short-term volatility impacts retirement survival.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>P10 Bear, P50 Median, and P90 Bull: </Text>
+                      P10 represents the conservative 10th percentile floor (90% of simulations ended above this value). P50 is the expected median baseline outcome. P90 represents strong bull market compounding.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Sequence of Returns Risk (SRR): </Text>
+                      The order in which returns occur. Experiencing negative returns in the first 5 years of retirement can permanently deplete a portfolio even if the long-term average return matches expectations.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Volatility Drag: </Text>
+                      The mathematical drag caused by market variance. A -30% drop requires a +43% gain just to break even (compound geometric mean ≈ arithmetic mean - σ²/2).
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Actuarial Survival Rate (%): </Text>
+                      The exact percentage of the 500 simulated trajectories that concluded with a positive balance without running out of money before the target horizon.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* In-depth 2: Historical Backtesting */}
                 <View
                   style={[
                     styles.cardItem,
@@ -656,22 +706,49 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
                   ]}
                 >
                   <Text style={[styles.cardTitle, { color: '#F59E0B' }]}>
-                    1. Historical Backtesting
+                    2. Historical Backtesting
                   </Text>
                   <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
                     Instead of simulating randomized future paths, backtesting applies your current asset allocation strategy directly to real historical market data.
                   </Text>
                   <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
                     <Text style={{ fontWeight: '700', color: colors.textPrimary }}>How it works: </Text>
-                    You "wind back the clock" to a specific date (e.g. Jan 1, 2000 or Jan 1, 2008) and track how your 3-bucket portfolio would have survived through the Dot-Com crash, the 2008 Financial Crisis, or 1970s Stagflation.
+                    You "wind back the clock" to a specific historical date (e.g. Jan 1, 2000 Dot-com crash or Jan 1, 2008 GFC) and track how your 3-bucket portfolio would have survived through actual crisis drawdowns and subsequent recoveries.
                   </Text>
-                  <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 10 }]}>
                     <Text style={{ fontWeight: '700', color: '#10B981' }}>Key Benefit: </Text>
                     Grounds your retirement plan in actual lived history rather than theoretical equations, exposing how your cash buffer prevents distress selling at market bottoms.
                   </Text>
+
+                  {/* Specific Terms Under Backtesting */}
+                  <View style={[styles.subContextCard, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+                    <Text style={[styles.subContextTitle, { color: '#F59E0B', marginBottom: 6 }]}>
+                      📚 Specific Terms Explained Under This Model:
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Maximum Drawdown (MDD): </Text>
+                      The percentage decline from the portfolio's highest peak to its lowest trough before a new peak is reached. Measures the worst pain an investor would have endured.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Trough Valuation: </Text>
+                      The exact lowest dollar or rupee balance the portfolio reached during the depth of the crisis before bottoming out.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Underwater Period & Recovery Time: </Text>
+                      The number of calendar years required for the portfolio to fully recover its pre-crisis peak value after experiencing a steep drawdown.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Bear Market Defense Rule: </Text>
+                      The algorithmic protocol in the 3-bucket strategy that halts equity sales whenever market returns are negative, funding living expenses solely from Bucket 2 debt and Bucket 1 cash.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Survivorship Bias: </Text>
+                      The tendency to assume past market survivors represent future certainty. Backtesting multiple independent crises (2000, 2008, 1973, 2020) eliminates single-event bias.
+                    </Text>
+                  </View>
                 </View>
 
-                {/* In-depth 2: Rolling Returns Analysis */}
+                {/* In-depth 3: Rolling Returns Analysis */}
                 <View
                   style={[
                     styles.cardItem,
@@ -679,7 +756,7 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
                   ]}
                 >
                   <Text style={[styles.cardTitle, { color: '#10B981' }]}>
-                    2. Rolling Returns Analysis
+                    3. Rolling Returns Analysis
                   </Text>
                   <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
                     A major flaw in standard point-to-point growth calculations is "sequence of returns risk" (the luck of the calendar year when you start). Rolling returns break down an investment timeline into overlapping blocks to eliminate this bias.
@@ -688,13 +765,40 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
                     <Text style={{ fontWeight: '700', color: colors.textPrimary }}>How it works: </Text>
                     If you have 20 years of market data, a rolling 5-year analysis computes returns from Year 1–5, Year 2–6, Year 3–7, and so on.
                   </Text>
-                  <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 10 }]}>
                     <Text style={{ fontWeight: '700', color: '#10B981' }}>Key Benefit: </Text>
                     Reveals the frequency and statistical probability of achieving positive growth over a holding horizon, showing you the absolute worst, median, and best outcomes experienced historically.
                   </Text>
+
+                  {/* Specific Terms Under Rolling Returns */}
+                  <View style={[styles.subContextCard, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+                    <Text style={[styles.subContextTitle, { color: '#10B981', marginBottom: 6 }]}>
+                      📚 Specific Terms Explained Under This Model:
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Overlapping Holding Blocks: </Text>
+                      Continuous rolling evaluation windows (e.g. 3-Year, 5-Year, 10-Year blocks) that evaluate every possible entry date across market cycles.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Point-to-Point Bias: </Text>
+                      The distorting error of evaluating performance based on an arbitrary start and end date (e.g. buying at the 2000 peak vs. buying at the 2009 bottom).
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Variance Compression (Central Limit Theorem): </Text>
+                      The statistical principle where holding an asset over longer periods narrows annualized return spread towards the true long-term compound mean (rolling volatility σ_roll ≈ σ / √N).
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Positive Return Probability: </Text>
+                      The percentage of all historical holding windows where annualized returns were positive. For 5-year equity blocks in US and India, this probability historically exceeds 96%.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Worst-Case Holding Window: </Text>
+                      The absolute lowest compound return experienced across all historical windows, representing the empirical lower bound for portfolio planning.
+                    </Text>
+                  </View>
                 </View>
 
-                {/* In-depth 3: Deterministic Stress Testing */}
+                {/* In-depth 4: Deterministic Stress Testing */}
                 <View
                   style={[
                     styles.cardItem,
@@ -702,7 +806,7 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
                   ]}
                 >
                   <Text style={[styles.cardTitle, { color: '#EC4899' }]}>
-                    3. Deterministic Stress Testing (Scenario Analysis)
+                    4. Deterministic Stress Testing (Scenario Analysis)
                   </Text>
                   <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
                     Unlike Monte Carlo's abstract percentage bands, deterministic stress testing models how a portfolio handles specific, hardcoded macroeconomic shocks.
@@ -711,13 +815,40 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
                     <Text style={{ fontWeight: '700', color: colors.textPrimary }}>How it works: </Text>
                     Institutions hardcode parameters to simulate acute crises, e.g.: "What happens if inflation spikes to 8% and equities plunge 30% simultaneously?" or "How will this wealth cope with 1970s-style stagflation?"
                   </Text>
-                  <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 10 }]}>
                     <Text style={{ fontWeight: '700', color: '#10B981' }}>Key Benefit: </Text>
                     Helps investors identify structural vulnerabilities, proving whether Bucket 1 cash and Bucket 2 debt buffers are sufficient to weather macroeconomic shocks.
                   </Text>
+
+                  {/* Specific Terms Under Stress Testing */}
+                  <View style={[styles.subContextCard, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+                    <Text style={[styles.subContextTitle, { color: '#EC4899', marginBottom: 6 }]}>
+                      📚 Specific Terms Explained Under This Model:
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Macroeconomic Shock Matrix: </Text>
+                      Hardcoded multi-variable stress vectors where inflation, interest rates, and equity earnings compress simultaneously to test structural weaknesses.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Stagflationary Drag: </Text>
+                      An adverse economic climate featuring elevated consumer price inflation (which escalates living expenses) alongside stagnant or negative nominal equity growth.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Correlation Breakdown: </Text>
+                      A tail-risk scenario (like 2022) where bonds fail to hedge equities because rising interest rates drag down both stock and debt asset prices simultaneously.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Solvency Margin & Cushion Trough: </Text>
+                      The percentage of initial corpus that remains intact at the absolute lowest point of the economic shock before ruin occurs.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Reverse Stress Testing: </Text>
+                      The institutional practice of identifying what scale of market crash or inflation spike would cause total strategy failure, ensuring buffers exceed that threshold.
+                    </Text>
+                  </View>
                 </View>
 
-                {/* In-depth 4: Goals-Based Wealth Management */}
+                {/* In-depth 5: Goals-Based Wealth Management */}
                 <View
                   style={[
                     styles.cardItem,
@@ -725,7 +856,7 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
                   ]}
                 >
                   <Text style={[styles.cardTitle, { color: '#8B5CF6' }]}>
-                    4. Goals-Based Wealth Management (GBWM)
+                    5. Goals-Based Wealth Management (GBWM)
                   </Text>
                   <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
                     Rather than focusing purely on maximizing return percentages or beating a market benchmark, Goals-Based Wealth Management structures your assets entirely around specific life milestones.
@@ -737,10 +868,37 @@ export const FinancialGlossaryModal: React.FC<FinancialGlossaryModalProps> = ({
                     {'\n'}• <Text style={{ fontWeight: '700', color: '#10B981' }}>Medium-Term (5–10 years):</Text> Moderate risk fixed income for college tuition and lifestyle upgrades.
                     {'\n'}• <Text style={{ fontWeight: '700', color: '#F59E0B' }}>Long-Term (15+ years):</Text> Aggressive growth equities for multi-generational wealth and lifelong retirement longevity.
                   </Text>
-                  <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                  <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 10 }]}>
                     <Text style={{ fontWeight: '700', color: '#10B981' }}>Key Benefit: </Text>
                     Prevents emotional panic during market downturns because you know your immediate cash needs and near-term milestones are insulated from volatile growth buckets.
                   </Text>
+
+                  {/* Specific Terms Under GBWM */}
+                  <View style={[styles.subContextCard, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+                    <Text style={[styles.subContextTitle, { color: '#8B5CF6', marginBottom: 6 }]}>
+                      📚 Specific Terms Explained Under This Model:
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Asset-Liability Matching (ALM): </Text>
+                      A structural planning approach that matches investment liquidity and duration directly to the timing and magnitude of future liabilities (e.g. child college fees in Year 7).
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Time-Horizon Bucketing: </Text>
+                      Partitioning money by when it is needed, keeping 1–3 years in liquid cash, 5–10 years in fixed income, and 15+ years in compound equities.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Mental Accounting & Behavioral Discipline: </Text>
+                      The psychological insulation achieved when an investor knows their grocery and living bills for the next 3 years are already sitting in liquid cash, eliminating the urge to panic sell equities.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Milestone Funding Ratio (%): </Text>
+                      The proportion of earmarked commitments (tuition, property, health reserves) that are 100% solvent and funded without impairing baseline retirement cash flow.
+                    </Text>
+                    <Text style={[styles.cardText, { color: colors.textSecondary }]}>
+                      • <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Generational Legacy Surplus: </Text>
+                      The residual compounded capital remaining in Bucket 3 after satisfying all lifetime living expenses and discrete life milestones, available for heirs or philanthropy.
+                    </Text>
+                  </View>
                 </View>
               </View>
             )}

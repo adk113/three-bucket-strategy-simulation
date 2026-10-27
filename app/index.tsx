@@ -119,8 +119,27 @@ export default function SimulationDashboard() {
   );
 
   const insights = useMemo(
-    () => generateStrategyInsights(inputs, simResults, mcSummary),
-    [inputs, simResults, mcSummary]
+    () =>
+      generateStrategyInsights(
+        inputs,
+        simResults,
+        mcSummary,
+        backtestResult,
+        rollingResult,
+        stressResult,
+        goalsResult,
+        modelComparison
+      ),
+    [
+      inputs,
+      simResults,
+      mcSummary,
+      backtestResult,
+      rollingResult,
+      stressResult,
+      goalsResult,
+      modelComparison,
+    ]
   );
 
   const handleSuggestSafeWithdrawal = () => {
@@ -436,12 +455,18 @@ export default function SimulationDashboard() {
                 onSelectModel={(m) => setInputs((prev) => ({ ...prev, selectedModel: m }))}
               />
 
-              {/* 4. Actuarial Insights Panel */}
+              {/* 4. Actuarial Insights Panel Tailored to Active Model */}
               <InsightsPanel
                 insights={insights}
                 mcSummary={mcSummary}
                 baseCountry={inputs.baseCountry}
                 simulationHorizon={inputs.simulationHorizon || 30}
+                selectedModel={inputs.selectedModel || 'monte_carlo'}
+                historicalBacktest={backtestResult}
+                rollingReturns={rollingResult}
+                stressTest={stressResult}
+                goalsBased={goalsResult}
+                modelComparison={modelComparison}
               />
 
               <View style={styles.footerNote}>
@@ -530,12 +555,18 @@ export default function SimulationDashboard() {
 
 
 
-            {/* 4. Actuarial Insights & Depletion Warning Panel */}
+            {/* 4. Actuarial Insights & Depletion Warning Panel Tailored to Active Model */}
             <InsightsPanel
               insights={insights}
               mcSummary={mcSummary}
               baseCountry={inputs.baseCountry}
               simulationHorizon={inputs.simulationHorizon || 30}
+              selectedModel={inputs.selectedModel || 'monte_carlo'}
+              historicalBacktest={backtestResult}
+              rollingReturns={rollingResult}
+              stressTest={stressResult}
+              goalsBased={goalsResult}
+              modelComparison={modelComparison}
             />
 
             {/* Footer Notes */}

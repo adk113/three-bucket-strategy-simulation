@@ -21,12 +21,13 @@ import {
   Settings2,
   X,
   Check,
-  ChevronDown,
   ShieldAlert,
   Activity,
   Target,
   Scale,
   Zap,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { DatePickerInput } from '../common/DatePickerInput';
@@ -380,8 +381,84 @@ export const InputSection: React.FC<InputSectionProps> = ({
   const activeRollingWindow = inputs.rollingWindowYears || 5;
   const activeStressScenario = inputs.stressTestScenario || 'equity_crash_30_inflation_8';
 
-  const handleModelChange = (m: WealthModelType) => {
+  const WEALTH_MODELS_LIST: {
+    id: WealthModelType;
+    title: string;
+    badge: string;
+    icon: string;
+    color: string;
+    shortDesc: string;
+  }[] = [
+    {
+      id: 'monte_carlo',
+      title: 'Monte Carlo',
+      badge: 'Risk Cone',
+      icon: '🎲',
+      color: '#38BDF8',
+      shortDesc: 'Stochastic Probabilistic Fan',
+    },
+    {
+      id: 'historical_backtest',
+      title: 'Historical Backtest',
+      badge: 'Crisis Replay',
+      icon: '📜',
+      color: '#F59E0B',
+      shortDesc: 'Real Historical Market Data',
+    },
+    {
+      id: 'rolling_returns',
+      title: 'Rolling Returns',
+      badge: 'Holding Horizon',
+      icon: '🔄',
+      color: '#10B981',
+      shortDesc: 'Sequence Bias Elimination',
+    },
+    {
+      id: 'stress_testing',
+      title: 'Stress Testing',
+      badge: 'Macro Shocks',
+      icon: '⚡',
+      color: '#EC4899',
+      shortDesc: 'Deterministic Structural Shocks',
+    },
+    {
+      id: 'goals_based',
+      title: 'Goals-Based (GBWM)',
+      badge: 'Milestones',
+      icon: '🎯',
+      color: '#8B5CF6',
+      shortDesc: 'Asset-Liability Bucketing',
+    },
+    {
+      id: 'comparison',
+      title: 'Compare All Models',
+      badge: 'Multi-Model',
+      icon: '⚖️',
+      color: '#6366F1',
+      shortDesc: 'Side-by-Side Unified Overlay',
+    },
+  ];
+
+  const modelScrollRef = React.useRef<any>(null);
+  const currentModelIndex = WEALTH_MODELS_LIST.findIndex((m) => m.id === activeModel);
+  const activeModelMeta = WEALTH_MODELS_LIST[currentModelIndex] || WEALTH_MODELS_LIST[0];
+
+  const handleModelChange = (m: WealthModelType, idx?: number) => {
     onChangeInputs({ ...inputs, selectedModel: m });
+    const targetIdx = idx !== undefined ? idx : WEALTH_MODELS_LIST.findIndex((item) => item.id === m);
+    if (targetIdx >= 0) {
+      modelScrollRef.current?.scrollTo({ x: Math.max(0, targetIdx * 140 - 24), animated: true });
+    }
+  };
+
+  const handleScrollPrev = () => {
+    const prevIdx = currentModelIndex > 0 ? currentModelIndex - 1 : WEALTH_MODELS_LIST.length - 1;
+    handleModelChange(WEALTH_MODELS_LIST[prevIdx].id, prevIdx);
+  };
+
+  const handleScrollNext = () => {
+    const nextIdx = currentModelIndex < WEALTH_MODELS_LIST.length - 1 ? currentModelIndex + 1 : 0;
+    handleModelChange(WEALTH_MODELS_LIST[nextIdx].id, nextIdx);
   };
 
   const handleCrisisChange = (c: HistoricalCrisisType) => {
@@ -425,149 +502,76 @@ export const InputSection: React.FC<InputSectionProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Model Chips Selector */}
+        {/* Tactical Scroll Navigation Controls for Switching Models */}
+        <View style={styles.modelScrollControlRow}>
+          <TouchableOpacity
+            onPress={handleScrollPrev}
+            style={[
+              styles.modelScrollArrowBtn,
+              { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle },
+            ]}
+            activeOpacity={0.7}
+          >
+            <ChevronLeft size={16} color={colors.textPrimary} />
+            <Text style={[styles.modelScrollArrowText, { color: colors.textSecondary }]}>Prev</Text>
+          </TouchableOpacity>
+
+          <View style={[styles.modelIndicatorPill, { backgroundColor: activeModelMeta.color + '15', borderColor: activeModelMeta.color + '40' }]}>
+            <Text style={[styles.modelIndicatorText, { color: activeModelMeta.color }]}>
+              {activeModelMeta.icon} Model {currentModelIndex + 1} of {WEALTH_MODELS_LIST.length}:{' '}
+              <Text style={{ fontWeight: '800' }}>{activeModelMeta.title}</Text>
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={handleScrollNext}
+            style={[
+              styles.modelScrollArrowBtn,
+              { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle },
+            ]}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.modelScrollArrowText, { color: colors.textSecondary }]}>Next</Text>
+            <ChevronRight size={16} color={colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Model Chips Horizontal Scroll Track */}
         <ScrollView
+          ref={modelScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 6, paddingVertical: 4 }}
+          contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
         >
-          <TouchableOpacity
-            onPress={() => handleModelChange('monte_carlo')}
-            style={[
-              styles.modelChip,
-              {
-                backgroundColor: activeModel === 'monte_carlo' ? '#38BDF820' : colors.surfaceCard,
-                borderColor: activeModel === 'monte_carlo' ? '#38BDF8' : colors.borderSubtle,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.modelChipText,
-                { color: activeModel === 'monte_carlo' ? '#38BDF8' : colors.textPrimary },
-              ]}
-            >
-              🎲 Monte Carlo
-            </Text>
-            <Text style={[styles.modelChipSub, { color: activeModel === 'monte_carlo' ? '#38BDF8' : colors.textMuted }]}>
-              Risk Cone
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => handleModelChange('historical_backtest')}
-            style={[
-              styles.modelChip,
-              {
-                backgroundColor: activeModel === 'historical_backtest' ? '#F59E0B20' : colors.surfaceCard,
-                borderColor: activeModel === 'historical_backtest' ? '#F59E0B' : colors.borderSubtle,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.modelChipText,
-                { color: activeModel === 'historical_backtest' ? '#F59E0B' : colors.textPrimary },
-              ]}
-            >
-              📜 Historical Backtest
-            </Text>
-            <Text style={[styles.modelChipSub, { color: activeModel === 'historical_backtest' ? '#F59E0B' : colors.textMuted }]}>
-              Crisis Replay
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => handleModelChange('rolling_returns')}
-            style={[
-              styles.modelChip,
-              {
-                backgroundColor: activeModel === 'rolling_returns' ? '#10B98120' : colors.surfaceCard,
-                borderColor: activeModel === 'rolling_returns' ? '#10B981' : colors.borderSubtle,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.modelChipText,
-                { color: activeModel === 'rolling_returns' ? '#10B981' : colors.textPrimary },
-              ]}
-            >
-              🔄 Rolling Returns
-            </Text>
-            <Text style={[styles.modelChipSub, { color: activeModel === 'rolling_returns' ? '#10B981' : colors.textMuted }]}>
-              Horizon Consistency
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => handleModelChange('stress_testing')}
-            style={[
-              styles.modelChip,
-              {
-                backgroundColor: activeModel === 'stress_testing' ? '#EC489920' : colors.surfaceCard,
-                borderColor: activeModel === 'stress_testing' ? '#EC4899' : colors.borderSubtle,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.modelChipText,
-                { color: activeModel === 'stress_testing' ? '#EC4899' : colors.textPrimary },
-              ]}
-            >
-              ⚡ Stress Testing
-            </Text>
-            <Text style={[styles.modelChipSub, { color: activeModel === 'stress_testing' ? '#EC4899' : colors.textMuted }]}>
-              Macro Shocks
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => handleModelChange('goals_based')}
-            style={[
-              styles.modelChip,
-              {
-                backgroundColor: activeModel === 'goals_based' ? '#8B5CF620' : colors.surfaceCard,
-                borderColor: activeModel === 'goals_based' ? '#8B5CF6' : colors.borderSubtle,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.modelChipText,
-                { color: activeModel === 'goals_based' ? '#8B5CF6' : colors.textPrimary },
-              ]}
-            >
-              🎯 Goals-Based
-            </Text>
-            <Text style={[styles.modelChipSub, { color: activeModel === 'goals_based' ? '#8B5CF6' : colors.textMuted }]}>
-              GBWM Milestones
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => handleModelChange('comparison')}
-            style={[
-              styles.modelChip,
-              {
-                backgroundColor: activeModel === 'comparison' ? '#6366F125' : colors.surfaceCard,
-                borderColor: activeModel === 'comparison' ? '#6366F1' : colors.borderSubtle,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.modelChipText,
-                { color: activeModel === 'comparison' ? '#6366F1' : colors.textPrimary },
-              ]}
-            >
-              ⚖️ Compare All
-            </Text>
-            <Text style={[styles.modelChipSub, { color: activeModel === 'comparison' ? '#6366F1' : colors.textMuted }]}>
-              Multi-Model View
-            </Text>
-          </TouchableOpacity>
+          {WEALTH_MODELS_LIST.map((m, idx) => {
+            const isCur = activeModel === m.id;
+            return (
+              <TouchableOpacity
+                key={m.id}
+                onPress={() => handleModelChange(m.id, idx)}
+                style={[
+                  styles.modelChip,
+                  {
+                    backgroundColor: isCur ? m.color + '20' : colors.surfaceCard,
+                    borderColor: isCur ? m.color : colors.borderSubtle,
+                  },
+                ]}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.modelChipText,
+                    { color: isCur ? m.color : colors.textPrimary },
+                  ]}
+                >
+                  {m.icon} {m.title}
+                </Text>
+                <Text style={[styles.modelChipSub, { color: isCur ? m.color : colors.textMuted }]}>
+                  {m.badge}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
 
         {/* Contextual Scenario Controls Based on Selected Model */}
@@ -2206,6 +2210,39 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  modelScrollControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 8,
+  },
+  modelScrollArrowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 2,
+  },
+  modelScrollArrowText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  modelIndicatorPill: {
+    flex: 1,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modelIndicatorText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   infoIconBtn: {
     padding: 4,
