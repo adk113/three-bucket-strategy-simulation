@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -97,6 +97,32 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
     Math.min(displayHorizon - 1, 9)
   );
   const [isTransferScheduleOpen, setIsTransferScheduleOpen] = useState<boolean>(false);
+  const [scheduleSource, setScheduleSource] = useState<'baseline' | 'active_model'>('baseline');
+
+  // Determine active model yearly results if available
+  const activeModelResults: YearSimulationResult[] | null = useMemo(() => {
+    if (selectedModel === 'historical_backtest' && historicalBacktest?.yearlyResults && historicalBacktest.yearlyResults.length > 0) {
+      return historicalBacktest.yearlyResults;
+    }
+    if (selectedModel === 'stress_testing' && stressTest?.yearlyResults && stressTest.yearlyResults.length > 0) {
+      return stressTest.yearlyResults;
+    }
+    if (selectedModel === 'goals_based' && goalsBased?.yearlyResults && goalsBased.yearlyResults.length > 0) {
+      return goalsBased.yearlyResults;
+    }
+    return null;
+  }, [selectedModel, historicalBacktest, stressTest, goalsBased]);
+
+  const hasAlternativeModelSchedule = activeModelResults !== null;
+
+  // Auto-align scheduleSource when alternative model is selected
+  useEffect(() => {
+    if (selectedModel === 'historical_backtest' || selectedModel === 'stress_testing' || selectedModel === 'goals_based') {
+      setScheduleSource('active_model');
+    } else {
+      setScheduleSource('baseline');
+    }
+  }, [selectedModel]);
 
   // Scalable slice up to 80 years
   const activeDisplayHorizon =
@@ -107,6 +133,14 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const displayedMedian = mcSummary.medianTrajectory.slice(0, effectiveHorizon);
   const displayedP10 = mcSummary.p10Trajectory.slice(0, effectiveHorizon);
   const displayedP90 = mcSummary.p90Trajectory.slice(0, effectiveHorizon);
+
+  // Active results slice for schedule and inspector
+  const activeScheduleResults = useMemo(() => {
+    if (scheduleSource === 'active_model' && activeModelResults) {
+      return activeModelResults.slice(0, effectiveHorizon);
+    }
+    return displayedResults;
+  }, [scheduleSource, activeModelResults, displayedResults, effectiveHorizon]);
 
   // Slices for alternative models with fallback to modelComparison summary
   const compBacktestModel = modelComparison?.models.find((m) => m.id === 'historical_backtest');
@@ -327,7 +361,11 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const rollingBestLine = buildLinePath(displayedRollingBest);
   const rollingWorstLine = buildLinePath(displayedRollingWorst);
 
-  const selectedData = displayedResults[safeYearIndex] || displayedResults[0];
+  const selectedData =
+    activeScheduleResults[safeYearIndex] ||
+    activeScheduleResults[0] ||
+    displayedResults[safeYearIndex] ||
+    displayedResults[0];
 
   // Dynamic X-axis ticks
   const generateXTicks = () => {
@@ -1358,9 +1396,14 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
             <ArrowRightLeft size={16} color={colors.accent} style={{ marginRight: 8 }} />
-            <Text style={[styles.scheduleToggleTitle, { color: colors.textPrimary }]}>
-              Year-on-Year Bucket Transfer Schedule ({displayedResults.length} Years)
-            </Text>
+            <View>
+              <Text style={[styles.scheduleToggleTitle, { color: colors.textPrimary }]}>
+                Year-on-Year Bucket Transfer Schedule ({activeScheduleResults.length} Years)
+              </Text>
+              <Text style={{ fontSize: 10, color: colors.textMuted }}>
+                Mode: {scheduleSource === 'active_model' ? (selectedModel === 'historical_backtest' ? `⚡ Backtest (${historicalBacktest?.title || 'Crisis'})` : selectedModel === 'stress_testing' ? `⚡ Stress (${stressTest?.title || 'Shock'})` : '⚡ Goals-Based') : '📊 Deterministic Baseline'}
+              </Text>
+            </View>
           </View>
           <Text style={[styles.scheduleToggleSub, { color: colors.accent }]}>
             {isTransferScheduleOpen ? 'Hide Schedule ▲' : 'View Schedule (All Years) ▼'}
@@ -1369,9 +1412,68 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
 
         {isTransferScheduleOpen && (
           <View style={[styles.scheduleContentBox, { borderTopColor: colors.borderSubtle }]}>
-            <Text style={[styles.scheduleHelpText, { color: colors.textMuted }]}>
-              Chronological year-on-year waterfall: living expense debits, B2→B1 cash floor refills, B3→B2 equity harvests, and bear market defense activation. Tap any row to inspect in chart.
-            </Text>
+            {/* Scenario Model Source Selector Bar */}
+            {hasAlternativeModelSchedule && (
+              <View style={styles.scheduleSourceToggleBar}>
+                <TouchableOpacity
+                  style={[
+                    styles.scheduleSourceBtn,
+                    scheduleSource === 'baseline' && [styles.scheduleSourceBtnActive, { backgroundColor: colors.accent }],
+                  ]}
+                  onPress={() => setScheduleSource('baseline')}
+                >
+                  <Text
+                    style={[
+                      styles.scheduleSourceBtnText,
+                      { color: scheduleSource === 'baseline' ? '#000' : colors.textSecondary },
+                      scheduleSource === 'baseline' && { fontWeight: '700' },
+                    ]}
+                  >
+                    📊 Baseline Plan
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.scheduleSourceBtn,
+                    scheduleSource === 'active_model' && [styles.scheduleSourceBtnActive, { backgroundColor: colors.accent }],
+                  ]}
+                  onPress={() => setScheduleSource('active_model')}
+                >
+                  <Text
+                    style={[
+                      styles.scheduleSourceBtnText,
+                      { color: scheduleSource === 'active_model' ? '#000' : colors.textSecondary },
+                      scheduleSource === 'active_model' && { fontWeight: '700' },
+                    ]}
+                  >
+                    ⚡ Active: {selectedModel === 'historical_backtest' ? (historicalBacktest?.title ? historicalBacktest.title.split(' ')[0] + ' ' + (historicalBacktest.title.split(' ')[1] || '') : 'Backtest') : selectedModel === 'stress_testing' ? (stressTest?.title ? stressTest.title.split(' ')[0] + ' ' + (stressTest.title.split(' ')[1] || '') : 'Stress') : 'Goals'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Dynamic Model Variance Explainer Callout */}
+            <View style={[styles.scheduleExplainerBox, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+              <Text style={[styles.scheduleExplainerTitle, { color: colors.accent }]}>
+                {scheduleSource === 'active_model'
+                  ? selectedModel === 'historical_backtest'
+                    ? `🛡️ Historical Crisis Transfer Protocol: ${historicalBacktest?.title}`
+                    : selectedModel === 'stress_testing'
+                    ? `⚡ Stress Shock Transfer Protocol: ${stressTest?.title}`
+                    : `🎯 Goals-Based Transfer Protocol`
+                  : `📊 Deterministic Baseline Transfer Protocol`}
+              </Text>
+              <Text style={[styles.scheduleHelpText, { color: colors.textSecondary, marginBottom: 0 }]}>
+                {scheduleSource === 'active_model'
+                  ? selectedModel === 'historical_backtest'
+                    ? 'In market crashes, Bear Market Defense activates: B3→B2 equity harvests are frozen (₹0) to prevent selling at bottoms. B2 (Debt) covers all B1 living expenses alone until equities recover.'
+                    : selectedModel === 'stress_testing'
+                    ? 'Inflation shock increases annual expenses (higher B2→B1 cash refill demand), while the equity crash freezes stock harvests in Year 1.'
+                    : 'Milestone years deduct capital outlays directly from designated buckets, altering subsequent refill demands.'
+                  : 'Predictable waterfall: annual expenses debited from B1 cash, B2 refills B1 cash floor, and B3 harvests steady growth gains to replenish B2.'}
+              </Text>
+            </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.tableScrollWrap}>
               <View>
@@ -1387,7 +1489,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
                 </View>
 
                 {/* Table Rows */}
-                {displayedResults.map((r, idx) => {
+                {activeScheduleResults.map((r, idx) => {
                   const isCurSelected = idx === safeYearIndex;
                   return (
                     <TouchableOpacity
@@ -2062,5 +2164,35 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: 9,
     fontWeight: '800',
+  },
+  scheduleSourceToggleBar: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    gap: 8,
+  },
+  scheduleSourceBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  scheduleSourceBtnActive: {
+    borderColor: 'transparent',
+  },
+  scheduleSourceBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  scheduleExplainerBox: {
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  scheduleExplainerTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 3,
   },
 });
