@@ -33,6 +33,7 @@ import {
   RotateCcw,
   Percent,
   TrendingUp,
+  Layers,
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { DatePickerInput } from '../common/DatePickerInput';
@@ -382,6 +383,42 @@ export const InputSection: React.FC<InputSectionProps> = ({
     }
     onChangeInputs({ ...inputs, multiCountryAllocations: list });
   };
+
+  // Bucket Tenure & Time Horizons Handlers
+  const handleUpdateBucket1Years = (years: number) => {
+    const clamped = Math.min(10, Math.max(1, Math.round(years)));
+    onChangeInputs({
+      ...inputs,
+      bucket1Years: clamped,
+    });
+  };
+
+  const handleUpdateBucket2Years = (years: number) => {
+    const clamped = Math.min(15, Math.max(1, Math.round(years)));
+    onChangeInputs({
+      ...inputs,
+      bucket2Years: clamped,
+    });
+  };
+
+  const handleAdjustBucket1Years = (delta: number) => {
+    handleUpdateBucket1Years((inputs.bucket1Years || 3) + delta);
+  };
+
+  const handleAdjustBucket2Years = (delta: number) => {
+    handleUpdateBucket2Years((inputs.bucket2Years || 7) + delta);
+  };
+
+  const b1Y = inputs.bucket1Years || 3;
+  const b2Y = inputs.bucket2Years || 7;
+  const totalBufferY = b1Y + b2Y;
+  const horizonY = inputs.simulationHorizon || 30;
+  const b3StartYear = totalBufferY + 1;
+  const b3RunwayY = Math.max(1, horizonY - totalBufferY);
+
+  const annualExpense = inputs.monthlyWithdrawal * 12;
+  const targetB1Amount = annualExpense * b1Y;
+  const targetB2Amount = annualExpense * b2Y;
 
   // Bucket Expected ROI (% Annual Returns) Logic
   const countryProfile =
@@ -1119,7 +1156,278 @@ export const InputSection: React.FC<InputSectionProps> = ({
         </View>
       </View>
 
-      {/* 5. Multi-Country & Multi-Asset Cross-Border Allocation (Bucket 3) */}
+      {/* 5. Bucket Tenures & Time Horizons */}
+      <View style={[styles.roiSection, { borderTopColor: colors.borderSubtle }]}>
+        <View style={styles.roiHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 220 }}>
+              <Layers size={18} color={colors.accent} style={{ marginRight: 8 }} />
+              <View>
+                <Text style={[styles.roiTitle, { color: colors.textPrimary }]}>
+                  Bucket Tenures & Time Horizons
+                </Text>
+                <Text style={[styles.roiSubtitle, { color: colors.textMuted }]}>
+                  Customize cash runway and debt duration. Bucket 3 growth horizon is auto-determined.
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.totalBufferPill, { backgroundColor: colors.accent + '15', borderColor: colors.accent + '40' }]}>
+              <Text style={[styles.totalBufferPillText, { color: colors.accent }]}>
+                {totalBufferY}Y Total Protection Buffer
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Visual Timeline Flow Ribbon */}
+        <View style={[styles.tenureFlowBox, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+          <View style={[styles.tenureFlowItem, { borderColor: PALETTE.bucket1.base + '50' }]}>
+            <View style={[styles.tenureDot, { backgroundColor: PALETTE.bucket1.base }]} />
+            <Text style={[styles.tenureFlowTitle, { color: PALETTE.bucket1.base }]}>
+              Bucket 1: Y1–{b1Y}
+            </Text>
+            <Text style={[styles.tenureFlowSub, { color: colors.textMuted }]}>
+              {b1Y}Y Cash Runway
+            </Text>
+          </View>
+
+          <Text style={[styles.flowArrow, { color: colors.textMuted }]}>➔</Text>
+
+          <View style={[styles.tenureFlowItem, { borderColor: PALETTE.bucket2.base + '50' }]}>
+            <View style={[styles.tenureDot, { backgroundColor: PALETTE.bucket2.base }]} />
+            <Text style={[styles.tenureFlowTitle, { color: PALETTE.bucket2.base }]}>
+              Bucket 2: Y{b1Y + 1}–{totalBufferY}
+            </Text>
+            <Text style={[styles.tenureFlowSub, { color: colors.textMuted }]}>
+              {b2Y}Y Debt Buffer
+            </Text>
+          </View>
+
+          <Text style={[styles.flowArrow, { color: colors.textMuted }]}>➔</Text>
+
+          <View style={[styles.tenureFlowItem, { borderColor: PALETTE.bucket3.base + '50' }]}>
+            <View style={[styles.tenureDot, { backgroundColor: PALETTE.bucket3.base }]} />
+            <Text style={[styles.tenureFlowTitle, { color: PALETTE.bucket3.base }]}>
+              Bucket 3: Y{b3StartYear}+
+            </Text>
+            <Text style={[styles.tenureFlowSub, { color: colors.textMuted }]}>
+              {b3RunwayY}Y Compounding
+            </Text>
+          </View>
+        </View>
+
+        {/* Interactive Tenure Control Cards */}
+        <View style={styles.roiCardsGrid}>
+          {/* Bucket 1 Tenure Card */}
+          <View style={[styles.roiBucketCard, { backgroundColor: colors.surfaceElevated, borderColor: PALETTE.bucket1.base + '50' }]}>
+            <View style={styles.roiCardTop}>
+              <View style={[styles.roiBucketBadge, { backgroundColor: PALETTE.bucket1.base + '25' }]}>
+                <Text style={[styles.roiBucketBadgeText, { color: PALETTE.bucket1.base }]}>
+                  Bucket 1: Years 1 to {b1Y} ({b1Y} Years Cash)
+                </Text>
+              </View>
+              <Text style={[styles.benchmarkRefText, { color: colors.textMuted }]}>
+                Default: 3 Years
+              </Text>
+            </View>
+
+            <Text style={[styles.roiBucketDesc, { color: colors.textSecondary }]}>
+              Zero-volatility cash floor. Fully covers annual living expenses for the first {b1Y} years of retirement.
+            </Text>
+
+            {/* Stepper + Input */}
+            <View style={styles.roiControlRow}>
+              <TouchableOpacity
+                onPress={() => handleAdjustBucket1Years(-1)}
+                style={[styles.roiStepBtn, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}
+              >
+                <Text style={[styles.roiStepBtnText, { color: colors.textPrimary }]}>−</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.roiInputWrap, { backgroundColor: colors.surfaceCard, borderColor: colors.border }]}>
+                <TextInput
+                  value={b1Y.toString()}
+                  onChangeText={(val) => handleUpdateBucket1Years(parseInt(val, 10) || 1)}
+                  keyboardType="number-pad"
+                  style={[styles.roiInput, { color: colors.textPrimary }]}
+                  placeholder="3"
+                  placeholderTextColor={colors.textMuted}
+                  underlineColorAndroid="transparent"
+                />
+                <Text style={[styles.roiUnit, { color: colors.textMuted }]}>Years Runway</Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => handleAdjustBucket1Years(1)}
+                style={[styles.roiStepBtn, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}
+              >
+                <Text style={[styles.roiStepBtnText, { color: colors.textPrimary }]}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Presets */}
+            <View style={styles.roiPresetsRow}>
+              {[1, 2, 3, 4, 5].map((preset) => (
+                <TouchableOpacity
+                  key={preset}
+                  onPress={() => handleUpdateBucket1Years(preset)}
+                  style={[
+                    styles.roiPresetChip,
+                    {
+                      backgroundColor: b1Y === preset ? PALETTE.bucket1.base : colors.surfaceCard,
+                      borderColor: b1Y === preset ? PALETTE.bucket1.base : colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.roiPresetChipText,
+                      { color: b1Y === preset ? '#FFFFFF' : colors.textSecondary },
+                    ]}
+                  >
+                    1 to {preset}Y {preset === 3 ? '⭐' : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Live Required Reserve Amount */}
+            <View style={[styles.realReturnBadge, { backgroundColor: colors.surfaceCard }]}>
+              <Text style={[styles.realReturnLabel, { color: colors.textMuted }]}>Target Cash Allocation:</Text>
+              <Text style={[styles.realReturnVal, { color: PALETTE.bucket1.base }]}>
+                {formatCurrency(targetB1Amount, country)} ({b1Y} Years Expenses)
+              </Text>
+            </View>
+          </View>
+
+          {/* Bucket 2 Tenure Card */}
+          <View style={[styles.roiBucketCard, { backgroundColor: colors.surfaceElevated, borderColor: PALETTE.bucket2.base + '50' }]}>
+            <View style={styles.roiCardTop}>
+              <View style={[styles.roiBucketBadge, { backgroundColor: PALETTE.bucket2.base + '25' }]}>
+                <Text style={[styles.roiBucketBadgeText, { color: PALETTE.bucket2.base }]}>
+                  Bucket 2: Years {b1Y + 1} to {totalBufferY} ({b2Y} Years Debt)
+                </Text>
+              </View>
+              <Text style={[styles.benchmarkRefText, { color: colors.textMuted }]}>
+                Default: 7 Years
+              </Text>
+            </View>
+
+            <Text style={[styles.roiBucketDesc, { color: colors.textSecondary }]}>
+              Income shock absorber. Provides {b2Y} years of bond buffer starting after Year {b1Y}.
+            </Text>
+
+            {/* Stepper + Input */}
+            <View style={styles.roiControlRow}>
+              <TouchableOpacity
+                onPress={() => handleAdjustBucket2Years(-1)}
+                style={[styles.roiStepBtn, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}
+              >
+                <Text style={[styles.roiStepBtnText, { color: colors.textPrimary }]}>−</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.roiInputWrap, { backgroundColor: colors.surfaceCard, borderColor: colors.border }]}>
+                <TextInput
+                  value={b2Y.toString()}
+                  onChangeText={(val) => handleUpdateBucket2Years(parseInt(val, 10) || 1)}
+                  keyboardType="number-pad"
+                  style={[styles.roiInput, { color: colors.textPrimary }]}
+                  placeholder="7"
+                  placeholderTextColor={colors.textMuted}
+                  underlineColorAndroid="transparent"
+                />
+                <Text style={[styles.roiUnit, { color: colors.textMuted }]}>Years Buffer</Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => handleAdjustBucket2Years(1)}
+                style={[styles.roiStepBtn, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}
+              >
+                <Text style={[styles.roiStepBtnText, { color: colors.textPrimary }]}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Presets */}
+            <View style={styles.roiPresetsRow}>
+              {[4, 5, 6, 7, 8, 10].map((preset) => (
+                <TouchableOpacity
+                  key={preset}
+                  onPress={() => handleUpdateBucket2Years(preset)}
+                  style={[
+                    styles.roiPresetChip,
+                    {
+                      backgroundColor: b2Y === preset ? PALETTE.bucket2.base : colors.surfaceCard,
+                      borderColor: b2Y === preset ? PALETTE.bucket2.base : colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.roiPresetChipText,
+                      { color: b2Y === preset ? '#FFFFFF' : colors.textSecondary },
+                    ]}
+                  >
+                    {preset}Y Buffer {preset === 7 ? '⭐' : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Live Required Reserve Amount */}
+            <View style={[styles.realReturnBadge, { backgroundColor: colors.surfaceCard }]}>
+              <Text style={[styles.realReturnLabel, { color: colors.textMuted }]}>Target Debt Allocation:</Text>
+              <Text style={[styles.realReturnVal, { color: PALETTE.bucket2.base }]}>
+                {formatCurrency(targetB2Amount, country)} ({b2Y} Years Expenses)
+              </Text>
+            </View>
+          </View>
+
+          {/* Bucket 3 Auto-Determined Card */}
+          <View style={[styles.roiBucketCard, { backgroundColor: colors.surfaceElevated, borderColor: PALETTE.bucket3.base + '50' }]}>
+            <View style={styles.roiCardTop}>
+              <View style={[styles.roiBucketBadge, { backgroundColor: PALETTE.bucket3.base + '25' }]}>
+                <Text style={[styles.roiBucketBadgeText, { color: PALETTE.bucket3.base }]}>
+                  Bucket 3: Years {b3StartYear} to {horizonY} ({b3RunwayY} Years Growth)
+                </Text>
+              </View>
+              <View style={[styles.autoBadge, { backgroundColor: '#8B5CF620', borderColor: '#8B5CF660' }]}>
+                <Text style={[styles.autoBadgeText, { color: '#A78BFA' }]}>⚡ Auto-Determined</Text>
+              </View>
+            </View>
+
+            <Text style={[styles.roiBucketDesc, { color: colors.textSecondary }]}>
+              Growth equities compound untouched because Buckets 1 & 2 fully insulate living expenses for the first {totalBufferY} years.
+            </Text>
+
+            <View style={[styles.autoCalculatedInfoBox, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+              <View style={styles.autoCalcRow}>
+                <Text style={[styles.autoCalcKey, { color: colors.textMuted }]}>Equity Start Year:</Text>
+                <Text style={[styles.autoCalcVal, { color: colors.textPrimary }]}>Year {b3StartYear} (after {totalBufferY}Y buffer)</Text>
+              </View>
+              <View style={styles.autoCalcRow}>
+                <Text style={[styles.autoCalcKey, { color: colors.textMuted }]}>Untouched Compounding Runway:</Text>
+                <Text style={[styles.autoCalcVal, { color: '#10B981', fontWeight: '800' }]}>{b3RunwayY} Years</Text>
+              </View>
+              <View style={styles.autoCalcRow}>
+                <Text style={[styles.autoCalcKey, { color: colors.textMuted }]}>Initial Equity Allocation:</Text>
+                <Text style={[styles.autoCalcVal, { color: PALETTE.bucket3.base, fontWeight: '800' }]}>
+                  {formatCurrency(split.bucket3, country)} ({((split.bucket3 / Math.max(1, inputs.initialCorpus)) * 100).toFixed(0)}% of corpus)
+                </Text>
+              </View>
+            </View>
+
+            {/* Impact Note */}
+            <View style={[styles.realReturnBadge, { backgroundColor: colors.surfaceCard }]}>
+              <Text style={[styles.realReturnLabel, { color: colors.textMuted }]}>Liquidation Immunity:</Text>
+              <Text style={[styles.realReturnVal, { color: '#10B981' }]}>
+                Zero forced equity selling for {totalBufferY} Years ✓
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* 6. Multi-Country & Multi-Asset Cross-Border Allocation (Bucket 3) */}
       <View style={[styles.foreignSection, { borderTopColor: colors.borderSubtle }]}>
         <View style={styles.foreignHeader}>
           <View>
@@ -2912,6 +3220,86 @@ const styles = StyleSheet.create({
   realReturnVal: {
     fontSize: 12,
     fontWeight: '800',
+  },
+  totalBufferPill: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  totalBufferPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  tenureFlowBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 10,
+    marginBottom: 6,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tenureFlowItem: {
+    flex: 1,
+    minWidth: 90,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  tenureDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginBottom: 4,
+  },
+  tenureFlowTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  tenureFlowSub: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  flowArrow: {
+    fontSize: 13,
+    fontWeight: '700',
+    paddingHorizontal: 2,
+  },
+  autoBadge: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  autoBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  autoCalculatedInfoBox: {
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 10,
+    gap: 6,
+  },
+  autoCalcRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  autoCalcKey: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  autoCalcVal: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 
