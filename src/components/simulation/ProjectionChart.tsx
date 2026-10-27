@@ -107,13 +107,41 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const displayedP10 = mcSummary.p10Trajectory.slice(0, effectiveHorizon);
   const displayedP90 = mcSummary.p90Trajectory.slice(0, effectiveHorizon);
 
-  // Slices for alternative models
-  const displayedBacktest = historicalBacktest?.trajectory.slice(0, effectiveHorizon) || [];
-  const displayedRollingMedian = rollingReturns?.medianTrajectory.slice(0, effectiveHorizon) || [];
-  const displayedRollingWorst = rollingReturns?.worstTrajectory.slice(0, effectiveHorizon) || [];
-  const displayedRollingBest = rollingReturns?.bestTrajectory.slice(0, effectiveHorizon) || [];
-  const displayedStress = stressTest?.trajectory.slice(0, effectiveHorizon) || [];
-  const displayedGoals = goalsBased?.trajectory.slice(0, effectiveHorizon) || [];
+  // Slices for alternative models with fallback to modelComparison summary
+  const compBacktestModel = modelComparison?.models.find((m) => m.id === 'historical_backtest');
+  const compRollingModel = modelComparison?.models.find((m) => m.id === 'rolling_returns');
+  const compStressModel = modelComparison?.models.find((m) => m.id === 'stress_testing');
+  const compGoalsModel = modelComparison?.models.find((m) => m.id === 'goals_based');
+
+  const displayedBacktest =
+    historicalBacktest?.trajectory && historicalBacktest.trajectory.length > 0
+      ? historicalBacktest.trajectory.slice(0, effectiveHorizon)
+      : compBacktestModel?.trajectory?.slice(0, effectiveHorizon) || [];
+
+  const displayedRollingMedian =
+    rollingReturns?.medianTrajectory && rollingReturns.medianTrajectory.length > 0
+      ? rollingReturns.medianTrajectory.slice(0, effectiveHorizon)
+      : compRollingModel?.trajectory?.slice(0, effectiveHorizon) || [];
+
+  const displayedRollingWorst =
+    rollingReturns?.worstTrajectory && rollingReturns.worstTrajectory.length > 0
+      ? rollingReturns.worstTrajectory.slice(0, effectiveHorizon)
+      : [];
+
+  const displayedRollingBest =
+    rollingReturns?.bestTrajectory && rollingReturns.bestTrajectory.length > 0
+      ? rollingReturns.bestTrajectory.slice(0, effectiveHorizon)
+      : [];
+
+  const displayedStress =
+    stressTest?.trajectory && stressTest.trajectory.length > 0
+      ? stressTest.trajectory.slice(0, effectiveHorizon)
+      : compStressModel?.trajectory?.slice(0, effectiveHorizon) || [];
+
+  const displayedGoals =
+    goalsBased?.trajectory && goalsBased.trajectory.length > 0
+      ? goalsBased.trajectory.slice(0, effectiveHorizon)
+      : compGoalsModel?.trajectory?.slice(0, effectiveHorizon) || [];
 
   const containerWidth = customWidth
     ? Math.max(280, customWidth)
@@ -127,41 +155,57 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const innerWidth = containerWidth - paddingLeft - paddingRight;
   const innerHeight = chartHeight - paddingTop - paddingBottom;
 
-  // Compute maximum values across displayed models
+  // Compute maximum values across displayed models cleanly
   const maxStackTotal = Math.max(...displayedResults.map((r) => r.totalCorpus), 1);
   const maxMCTotal = Math.max(...displayedP90, ...displayedMedian, 1);
-  const maxComparisonTotal = Math.max(
+
+  // Safe realistic multi-model comparison scaling across the 5 central trajectories
+  const compCandidates = [
     ...displayedMedian,
     ...displayedBacktest,
-    ...displayedRollingBest,
+    ...displayedRollingMedian,
     ...displayedStress,
     ...displayedGoals,
-    1
-  );
+  ].filter((v) => typeof v === 'number' && isFinite(v) && v > 0);
+  const maxComparisonTotal =
+    compCandidates.length > 0 ? Math.max(...compCandidates) : maxStackTotal;
 
   let maxVal = maxStackTotal * 1.15;
-  if (activeTab === 'montecarlo') maxVal = maxMCTotal * 1.15;
-  else if (activeTab === 'comparison') maxVal = maxComparisonTotal * 1.15;
-  else if (activeTab === 'active_model') {
+  if (activeTab === 'montecarlo') {
+    maxVal = maxMCTotal * 1.15;
+  } else if (activeTab === 'comparison') {
+    maxVal = maxComparisonTotal * 1.18;
+  } else if (activeTab === 'active_model') {
     if (selectedModel === 'historical_backtest') {
-      maxVal = Math.max(...displayedBacktest, 1) * 1.18;
+      const candidates = displayedBacktest.filter((v) => typeof v === 'number' && isFinite(v) && v > 0);
+      maxVal = (candidates.length > 0 ? Math.max(...candidates) : maxStackTotal) * 1.18;
     } else if (selectedModel === 'rolling_returns') {
-      maxVal = Math.max(...displayedRollingBest, 1) * 1.18;
+      const candidates = [...displayedRollingBest, ...displayedRollingMedian, ...displayedRollingWorst].filter(
+        (v) => typeof v === 'number' && isFinite(v) && v > 0
+      );
+      maxVal = (candidates.length > 0 ? Math.max(...candidates) : maxStackTotal) * 1.18;
     } else if (selectedModel === 'stress_testing') {
-      maxVal = Math.max(...displayedStress, 1) * 1.18;
+      const candidates = displayedStress.filter((v) => typeof v === 'number' && isFinite(v) && v > 0);
+      maxVal = (candidates.length > 0 ? Math.max(...candidates) : maxStackTotal) * 1.18;
     } else if (selectedModel === 'goals_based') {
-      maxVal = Math.max(...displayedGoals, 1) * 1.18;
+      const candidates = displayedGoals.filter((v) => typeof v === 'number' && isFinite(v) && v > 0);
+      maxVal = (candidates.length > 0 ? Math.max(...candidates) : maxStackTotal) * 1.18;
     }
   }
 
+  const safeMaxVal = typeof maxVal === 'number' && isFinite(maxVal) && maxVal > 0 ? maxVal : 1;
+
   const scaleY = (val: number) => {
-    const clamped = Math.max(0, Math.min(val, maxVal));
-    return paddingTop + innerHeight - (clamped / maxVal) * innerHeight;
+    const num = typeof val === 'number' && isFinite(val) ? val : 0;
+    const clamped = Math.max(0, Math.min(num, safeMaxVal));
+    const y = paddingTop + innerHeight - (clamped / safeMaxVal) * innerHeight;
+    return typeof y === 'number' && isFinite(y) ? y : paddingTop + innerHeight;
   };
 
   const scaleX = (index: number) => {
     const divisor = Math.max(1, effectiveHorizon - 1);
-    return paddingLeft + (index / divisor) * innerWidth;
+    const x = paddingLeft + (index / divisor) * innerWidth;
+    return typeof x === 'number' && isFinite(x) ? x : paddingLeft;
   };
 
   // Stacked Area Paths
@@ -179,22 +223,22 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
       const yB3 = scaleY(r.bucket1 + r.bucket2 + r.bucket3);
 
       if (idx === 0) {
-        b1Line += `M ${x} ${yB1}`;
-        b2Line += `M ${x} ${yB2}`;
-        b3Line += `M ${x} ${yB3}`;
+        b1Line += `M ${x.toFixed(1)} ${yB1.toFixed(1)}`;
+        b2Line += `M ${x.toFixed(1)} ${yB2.toFixed(1)}`;
+        b3Line += `M ${x.toFixed(1)} ${yB3.toFixed(1)}`;
       } else {
-        b1Line += ` L ${x} ${yB1}`;
-        b2Line += ` L ${x} ${yB2}`;
-        b3Line += ` L ${x} ${yB3}`;
+        b1Line += ` L ${x.toFixed(1)} ${yB1.toFixed(1)}`;
+        b2Line += ` L ${x.toFixed(1)} ${yB2.toFixed(1)}`;
+        b3Line += ` L ${x.toFixed(1)} ${yB3.toFixed(1)}`;
       }
     });
 
     const lastX = scaleX(effectiveHorizon - 1);
     const firstX = scaleX(0);
 
-    const b1Path = `${b1Line} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
-    const b2Path = `${b2Line} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
-    const b3Path = `${b3Line} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
+    const b1Path = `${b1Line} L ${lastX.toFixed(1)} ${bottomY.toFixed(1)} L ${firstX.toFixed(1)} ${bottomY.toFixed(1)} Z`;
+    const b2Path = `${b2Line} L ${lastX.toFixed(1)} ${bottomY.toFixed(1)} L ${firstX.toFixed(1)} ${bottomY.toFixed(1)} Z`;
+    const b3Path = `${b3Line} L ${lastX.toFixed(1)} ${bottomY.toFixed(1)} L ${firstX.toFixed(1)} ${bottomY.toFixed(1)} Z`;
 
     return { b1Path, b2Path, b3Path };
   };
@@ -212,13 +256,13 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
       const yP10 = scaleY(displayedP10[i] || 0);
 
       if (i === 0) {
-        p90Line += `M ${x} ${yP90}`;
-        p50Line += `M ${x} ${yP50}`;
-        p10Line += `M ${x} ${yP10}`;
+        p90Line += `M ${x.toFixed(1)} ${yP90.toFixed(1)}`;
+        p50Line += `M ${x.toFixed(1)} ${yP50.toFixed(1)}`;
+        p10Line += `M ${x.toFixed(1)} ${yP10.toFixed(1)}`;
       } else {
-        p90Line += ` L ${x} ${yP90}`;
-        p50Line += ` L ${x} ${yP50}`;
-        p10Line += ` L ${x} ${yP10}`;
+        p90Line += ` L ${x.toFixed(1)} ${yP90.toFixed(1)}`;
+        p50Line += ` L ${x.toFixed(1)} ${yP50.toFixed(1)}`;
+        p10Line += ` L ${x.toFixed(1)} ${yP10.toFixed(1)}`;
       }
     }
 
@@ -226,29 +270,52 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
     for (let i = effectiveHorizon - 1; i >= 0; i--) {
       const x = scaleX(i);
       const yP10 = scaleY(displayedP10[i] || 0);
-      bandPath += ` L ${x} ${yP10}`;
+      bandPath += ` L ${x.toFixed(1)} ${yP10.toFixed(1)}`;
     }
     bandPath += ' Z';
 
     return { p90Line, p50Line, p10Line, bandPath };
   };
 
-  // Build generic line path from an array of numbers
+  // Generic Line Path builder
   const buildLinePath = (data: number[]) => {
+    if (!data || data.length === 0) return '';
     let path = '';
-    for (let i = 0; i < Math.min(data.length, effectiveHorizon); i++) {
+    const len = Math.min(data.length, effectiveHorizon);
+    for (let i = 0; i < len; i++) {
+      const val = typeof data[i] === 'number' && isFinite(data[i]) ? data[i] : 0;
       const x = scaleX(i);
-      const y = scaleY(data[i] || 0);
-      if (i === 0) path += `M ${x} ${y}`;
-      else path += ` L ${x} ${y}`;
+      const y = scaleY(val);
+      if (i === 0) path += `M ${x.toFixed(1)} ${y.toFixed(1)}`;
+      else path += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
     }
     return path;
   };
 
+  // Rolling envelope band (between Best and Worst holding blocks)
+  const buildRollingBandPath = () => {
+    if (displayedRollingBest.length === 0 || displayedRollingWorst.length === 0) return '';
+    let topPath = '';
+    for (let i = 0; i < Math.min(displayedRollingBest.length, effectiveHorizon); i++) {
+      const x = scaleX(i);
+      const y = scaleY(displayedRollingBest[i] || 0);
+      if (i === 0) topPath += `M ${x.toFixed(1)} ${y.toFixed(1)}`;
+      else topPath += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }
+    let bottomPath = '';
+    for (let i = Math.min(displayedRollingWorst.length, effectiveHorizon) - 1; i >= 0; i--) {
+      const x = scaleX(i);
+      const y = scaleY(displayedRollingWorst[i] || 0);
+      bottomPath += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }
+    return topPath + bottomPath + ' Z';
+  };
+
   const { b1Path, b2Path, b3Path } = buildStackedAreaPaths();
   const { p90Line, p50Line, p10Line, bandPath } = buildMCPaths();
+  const rollingBandPath = buildRollingBandPath();
 
-  // Model comparison lines
+  // Model comparison lines (Unified 5-model overlay)
   const mcCompLine = buildLinePath(displayedMedian);
   const backtestCompLine = buildLinePath(displayedBacktest);
   const rollingMedianCompLine = buildLinePath(displayedRollingMedian);
@@ -413,7 +480,15 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
                       { color: activeTab === 'active_model' ? '#FFFFFF' : colors.textSecondary },
                     ]}
                   >
-                    Active Model
+                    {selectedModel === 'historical_backtest'
+                      ? '📜 Backtest'
+                      : selectedModel === 'rolling_returns'
+                      ? `📈 Rolling (${rollingReturns?.windowYears || 5}Y)`
+                      : selectedModel === 'stress_testing'
+                      ? '⚡ Stress Shock'
+                      : selectedModel === 'goals_based'
+                      ? '🎯 Goals (GBWM)'
+                      : 'Active Model'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -581,9 +656,42 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
 
               {selectedModel === 'rolling_returns' && (
                 <G>
-                  <Path d={rollingBestLine} fill="none" stroke="#10B981" strokeWidth="2" strokeDasharray="3 3" />
-                  <Path d={rollingMedianCompLine} fill="none" stroke="#10B981" strokeWidth="2.8" />
-                  <Path d={rollingWorstLine} fill="none" stroke="#F59E0B" strokeWidth="2" strokeDasharray="3 3" />
+                  {/* Rolling Envelope Area Fill */}
+                  {rollingBandPath ? (
+                    <Path d={rollingBandPath} fill="url(#rollingGrad)" />
+                  ) : null}
+                  {/* Best Block (Top Historical Horizon) */}
+                  <Path d={rollingBestLine} fill="none" stroke="#10B981" strokeWidth="2.2" strokeDasharray="4 2" />
+                  {/* Median Block (Compound Baseline) */}
+                  <Path d={rollingMedianCompLine} fill="none" stroke="#10B981" strokeWidth="3" />
+                  {/* Worst Block (Lowest Historical Floor) */}
+                  <Path d={rollingWorstLine} fill="none" stroke="#F59E0B" strokeWidth="2.2" strokeDasharray="4 2" />
+
+                  {/* Vertical Window Boundary Marker */}
+                  {rollingReturns?.windowYears && rollingReturns.windowYears < effectiveHorizon && (
+                    <G>
+                      <Line
+                        x1={scaleX(rollingReturns.windowYears - 1)}
+                        y1={paddingTop}
+                        x2={scaleX(rollingReturns.windowYears - 1)}
+                        y2={paddingTop + innerHeight}
+                        stroke="#10B981"
+                        strokeWidth="1.5"
+                        strokeDasharray="3 3"
+                        opacity={0.6}
+                      />
+                      <SvgText
+                        x={scaleX(rollingReturns.windowYears - 1) + 4}
+                        y={paddingTop + 14}
+                        fill="#10B981"
+                        fontSize="9"
+                        fontWeight="700"
+                        fontFamily="System"
+                      >
+                        {rollingReturns.windowYears}Y Block
+                      </SvgText>
+                    </G>
+                  )}
                 </G>
               )}
 
@@ -629,46 +737,56 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
           {activeTab === 'comparison' && (
             <G>
               {/* Monte Carlo Median (Cyan) */}
-              <Path d={mcCompLine} fill="none" stroke="#38BDF8" strokeWidth="2.4" />
+              {mcCompLine ? <Path d={mcCompLine} fill="none" stroke="#38BDF8" strokeWidth="2.8" /> : null}
               {/* Historical Backtest (Orange) */}
-              <Path d={backtestCompLine} fill="none" stroke="#F59E0B" strokeWidth="2.4" />
-              {/* Rolling Returns Median (Green) */}
-              <Path d={rollingMedianCompLine} fill="none" stroke="#10B981" strokeWidth="2.4" />
-              {/* Stress Test (Pink) */}
-              <Path d={stressCompLine} fill="none" stroke="#EC4899" strokeWidth="2.4" />
-              {/* Goals-Based (Purple) */}
-              <Path d={goalsCompLine} fill="none" stroke="#8B5CF6" strokeWidth="2.4" />
+              {backtestCompLine ? <Path d={backtestCompLine} fill="none" stroke="#F59E0B" strokeWidth="2.8" /> : null}
+              {/* Rolling Returns Median (Emerald Green) */}
+              {rollingMedianCompLine ? <Path d={rollingMedianCompLine} fill="none" stroke="#10B981" strokeWidth="2.8" /> : null}
+              {/* Stress Test (Pink Dashed) */}
+              {stressCompLine ? <Path d={stressCompLine} fill="none" stroke="#EC4899" strokeWidth="2.8" strokeDasharray="5 3" /> : null}
+              {/* Goals-Based (Purple Dashed) */}
+              {goalsCompLine ? <Path d={goalsCompLine} fill="none" stroke="#8B5CF6" strokeWidth="2.8" strokeDasharray="8 3" /> : null}
 
-              {/* Inspection dots at selected year */}
+              {/* Glowing inspection dots at selected year */}
               <Circle
                 cx={scaleX(safeYearIndex)}
                 cy={scaleY(displayedMedian[safeYearIndex] || 0)}
-                r={4}
+                r={6}
                 fill="#38BDF8"
+                stroke="#FFFFFF"
+                strokeWidth={2}
               />
               <Circle
                 cx={scaleX(safeYearIndex)}
                 cy={scaleY(displayedBacktest[safeYearIndex] || 0)}
-                r={4}
+                r={6}
                 fill="#F59E0B"
+                stroke="#FFFFFF"
+                strokeWidth={2}
               />
               <Circle
                 cx={scaleX(safeYearIndex)}
                 cy={scaleY(displayedRollingMedian[safeYearIndex] || 0)}
-                r={4}
+                r={6}
                 fill="#10B981"
+                stroke="#FFFFFF"
+                strokeWidth={2}
               />
               <Circle
                 cx={scaleX(safeYearIndex)}
                 cy={scaleY(displayedStress[safeYearIndex] || 0)}
-                r={4}
+                r={6}
                 fill="#EC4899"
+                stroke="#FFFFFF"
+                strokeWidth={2}
               />
               <Circle
                 cx={scaleX(safeYearIndex)}
                 cy={scaleY(displayedGoals[safeYearIndex] || 0)}
-                r={4}
+                r={6}
                 fill="#8B5CF6"
+                stroke="#FFFFFF"
+                strokeWidth={2}
               />
             </G>
           )}
@@ -904,6 +1022,190 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
             </View>
           </View>
         </View>
+      ) : activeTab === 'active_model' && selectedModel === 'rolling_returns' && rollingReturns ? (
+        /* Rolling Returns Inspector Card */
+        <View style={[styles.inspectorCard, { backgroundColor: colors.surfaceElevated }]}>
+          <View style={styles.inspectorHeader}>
+            <Text style={[styles.inspectorYearTitle, { color: colors.textPrimary }]}>
+              Year {selectedData.year} ({selectedData.calendarYear}) • {rollingReturns.windowYears}-Year Holding Frequency
+            </Text>
+            <Text style={[styles.inspectorTotalVal, { color: '#10B981' }]}>
+              Median: {formatCurrency(displayedRollingMedian[safeYearIndex] || 0, baseCountry)}
+            </Text>
+          </View>
+
+          <View style={styles.metricGrid}>
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#10B981' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Best {rollingReturns.windowYears}Y Block:</Text>
+              <Text style={[styles.metricVal, { color: '#10B981' }]}>
+                {formatCurrency(displayedRollingBest[safeYearIndex] || 0, baseCountry)}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#10B981' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Median Compounding:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(displayedRollingMedian[safeYearIndex] || 0, baseCountry)}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#F59E0B' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Worst {rollingReturns.windowYears}Y Floor:</Text>
+              <Text style={[styles.metricVal, { color: '#F59E0B' }]}>
+                {formatCurrency(displayedRollingWorst[safeYearIndex] || 0, baseCountry)}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#38BDF8' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Annualized Range:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                +{rollingReturns.minReturnPct}% to +{rollingReturns.maxReturnPct}% p.a.
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : activeTab === 'active_model' && selectedModel === 'historical_backtest' && historicalBacktest ? (
+        /* Historical Backtest Inspector Card */
+        <View style={[styles.inspectorCard, { backgroundColor: colors.surfaceElevated }]}>
+          <View style={styles.inspectorHeader}>
+            <Text style={[styles.inspectorYearTitle, { color: colors.textPrimary }]}>
+              Year {selectedData.year} ({selectedData.calendarYear}) • {historicalBacktest.title}
+            </Text>
+            <Text style={[styles.inspectorTotalVal, { color: '#F59E0B' }]}>
+              Corpus: {formatCurrency(displayedBacktest[safeYearIndex] || 0, baseCountry)}
+            </Text>
+          </View>
+
+          <View style={styles.metricGrid}>
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#F59E0B' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Crisis Replay:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {historicalBacktest.scenarioKey.toUpperCase().replace('_', ' ')}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#EF4444' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Max Drawdown:</Text>
+              <Text style={[styles.metricVal, { color: '#EF4444' }]}>
+                -{historicalBacktest.maxDrawdownPct}%
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#10B981' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Recovery Status:</Text>
+              <Text style={[styles.metricVal, { color: '#10B981' }]}>
+                {historicalBacktest.recoveryYears ? `Recovered in ${historicalBacktest.recoveryYears}Y` : 'Under Buffer Defense'}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#38BDF8' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Final Rebound:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(historicalBacktest.terminalBalance, baseCountry)}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : activeTab === 'active_model' && selectedModel === 'stress_testing' && stressTest ? (
+        /* Stress Testing Inspector Card */
+        <View style={[styles.inspectorCard, { backgroundColor: colors.surfaceElevated }]}>
+          <View style={styles.inspectorHeader}>
+            <Text style={[styles.inspectorYearTitle, { color: colors.textPrimary }]}>
+              Year {selectedData.year} ({selectedData.calendarYear}) • {stressTest.title}
+            </Text>
+            <Text style={[styles.inspectorTotalVal, { color: '#EC4899' }]}>
+              Post-Shock: {formatCurrency(displayedStress[safeYearIndex] || 0, baseCountry)}
+            </Text>
+          </View>
+
+          <View style={styles.metricGrid}>
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#EC4899' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Solvency Cushion:</Text>
+              <Text style={[styles.metricVal, { color: stressTest.cushionRemainingPct >= 50 ? '#10B981' : '#F59E0B' }]}>
+                {stressTest.cushionRemainingPct}% Remaining
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#F59E0B' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Lowest Dip (Trough):</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(stressTest.lowestCorpusTrough, baseCountry)} (Y{stressTest.troughYear})
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#10B981' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Terminal Balance:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(stressTest.terminalBalance, baseCountry)}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#38BDF8' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Survival Outcome:</Text>
+              <Text style={[styles.metricVal, { color: stressTest.survived ? '#10B981' : '#EF4444' }]}>
+                {stressTest.survived ? 'Fully Solvent' : 'Exhausted Early'}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : activeTab === 'active_model' && selectedModel === 'goals_based' && goalsBased ? (
+        /* Goals Based Inspector Card */
+        <View style={[styles.inspectorCard, { backgroundColor: colors.surfaceElevated }]}>
+          <View style={styles.inspectorHeader}>
+            <Text style={[styles.inspectorYearTitle, { color: colors.textPrimary }]}>
+              Year {selectedData.year} ({selectedData.calendarYear}) • Goals-Based (GBWM)
+            </Text>
+            <Text style={[styles.inspectorTotalVal, { color: '#8B5CF6' }]}>
+              Net Wealth: {formatCurrency(displayedGoals[safeYearIndex] || 0, baseCountry)}
+            </Text>
+          </View>
+
+          <View style={styles.metricGrid}>
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#8B5CF6' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Milestones Funded:</Text>
+              <Text style={[styles.metricVal, { color: goalsBased.allMilestonesFunded ? '#10B981' : '#F59E0B' }]}>
+                {goalsBased.milestoneStatuses.filter((m) => m.isFullyFunded).length}/{goalsBased.milestoneStatuses.length} Goals
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#10B981' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Immediate Cash Runway:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {goalsBased.shortTermRunwayYears} Years Protected
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#38BDF8' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Medium-Term Shield:</Text>
+              <Text style={[styles.metricVal, { color: goalsBased.mediumTermShieldFunded ? '#10B981' : '#F59E0B' }]}>
+                {goalsBased.mediumTermShieldFunded ? 'Fully Funded' : 'Partial'}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <View style={[styles.metricDot, { backgroundColor: '#F43F5E' }]} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Legacy Surplus:</Text>
+              <Text style={[styles.metricVal, { color: colors.textPrimary }]}>
+                {formatCurrency(goalsBased.terminalLegacySurplus, baseCountry)}
+              </Text>
+            </View>
+          </View>
+        </View>
       ) : (
         /* Standard 3-Bucket / Monte Carlo Inspector Card */
         <View style={[styles.inspectorCard, { backgroundColor: colors.surfaceElevated }]}>
@@ -949,6 +1251,77 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
               </Text>
             </View>
           </View>
+        </View>
+      )}
+
+      {/* Educational Guide for Rolling Returns Holding Block Windows */}
+      {selectedModel === 'rolling_returns' && rollingReturns && (
+        <View style={[styles.rollingExplainerBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle }]}>
+          <View style={styles.explainerHeaderRow}>
+            <Activity size={16} color="#10B981" style={{ marginRight: 6 }} />
+            <Text style={[styles.explainerTitle, { color: colors.textPrimary }]}>
+              Understanding the Rolling Returns Graph ({rollingReturns.windowYears}-Year Holding Windows)
+            </Text>
+          </View>
+          
+          <Text style={[styles.explainerText, { color: colors.textSecondary, marginBottom: 8 }]}>
+            Standard point-to-point forecasts suffer from starting-year sequence luck. This model breaks market history into continuous, overlapping <Text style={{ fontWeight: '700', color: '#10B981' }}>{rollingReturns.windowYears}-year holding blocks</Text> to show what an investor realistically endures:
+          </Text>
+
+          {/* 3 Blocks Explanation Grid */}
+          <View style={styles.rollingCardsRow}>
+            <View style={[styles.rollingMiniCard, { backgroundColor: colors.surfaceCard, borderColor: '#10B981' }]}>
+              <Text style={[styles.miniCardTitle, { color: '#10B981' }]}>🟢 Top Line (Best Block)</Text>
+              <Text style={[styles.miniCardStat, { color: '#10B981' }]}>+{rollingReturns.maxReturnPct}% p.a.</Text>
+              <Text style={[styles.miniCardSub, { color: colors.textMuted }]}>
+                Corpus path if starting at the most profitable historical {rollingReturns.windowYears}Y bull rally.
+              </Text>
+            </View>
+
+            <View style={[styles.rollingMiniCard, { backgroundColor: colors.surfaceCard, borderColor: '#38BDF8' }]}>
+              <Text style={[styles.miniCardTitle, { color: '#38BDF8' }]}>❇️ Center Line (Median)</Text>
+              <Text style={[styles.miniCardStat, { color: '#38BDF8' }]}>+{rollingReturns.medianReturnPct}% p.a.</Text>
+              <Text style={[styles.miniCardSub, { color: colors.textMuted }]}>
+                The baseline compound expectation across all historical {rollingReturns.windowYears}Y holding periods.
+              </Text>
+            </View>
+
+            <View style={[styles.rollingMiniCard, { backgroundColor: colors.surfaceCard, borderColor: '#F59E0B' }]}>
+              <Text style={[styles.miniCardTitle, { color: '#F59E0B' }]}>🟠 Lower Line (Worst Floor)</Text>
+              <Text style={[styles.miniCardStat, { color: '#F59E0B' }]}>+{rollingReturns.minReturnPct}% p.a.</Text>
+              <Text style={[styles.miniCardSub, { color: colors.textMuted }]}>
+                The worst historical stress block (e.g. retiring right before an acute market drawdown).
+              </Text>
+            </View>
+          </View>
+
+          {/* CLT Compression Callout */}
+          <View style={[styles.takeawayPill, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+            <Text style={[styles.takeawayPillText, { color: colors.textSecondary }]}>
+              💡 <Text style={{ fontWeight: '700', color: '#10B981' }}>Why 3Y vs 5Y vs 10Y Changes the Graph: </Text>
+              Notice how switching from <Text style={{ fontWeight: '700', color: colors.textPrimary }}>3Y → 5Y → 10Y</Text> visibly squeezes the gap between the Top and Bottom lines! With a 10-Year window, the historical chance of positive return reaches <Text style={{ fontWeight: '700', color: '#10B981' }}>{rollingReturns.positiveReturnProbabilityPct}%</Text>, proving that extended time horizons systematically eliminate downside volatility drag (Central Limit Theorem).
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Guide Banner for Multi-Model Comparison */}
+      {activeTab === 'comparison' && (
+        <View style={[styles.comparisonGuideBanner, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle }]}>
+          <View style={styles.comparisonGuideRow}>
+            <Scale size={16} color="#6366F1" style={{ marginRight: 6 }} />
+            <Text style={[styles.comparisonGuideTitle, { color: colors.textPrimary }]}>
+              How to Compare All 5 Lines on the Chart
+            </Text>
+          </View>
+          <Text style={[styles.comparisonGuideText, { color: colors.textSecondary }]}>
+            All 5 curves start at your exact initial corpus ({formatCurrency(results[0]?.totalCorpus || 0, baseCountry)}) and apply identical annual expenses.
+            {'\n'}• <Text style={{ fontWeight: '700', color: '#38BDF8' }}>Cyan Solid: </Text>Monte Carlo P50 Median (500 stochastic trials)
+            {'\n'}• <Text style={{ fontWeight: '700', color: '#F59E0B' }}>Orange Solid: </Text>Historical Backtest (2008 GFC crisis replay with zero equity sales during crash)
+            {'\n'}• <Text style={{ fontWeight: '700', color: '#10B981' }}>Green Solid: </Text>Rolling Returns Median ({rollingReturns?.windowYears || 5}Y holding block)
+            {'\n'}• <Text style={{ fontWeight: '700', color: '#EC4899' }}>Pink Dashed: </Text>Deterministic Stress Test (8% inflation + -30% equity shock)
+            {'\n'}• <Text style={{ fontWeight: '700', color: '#8B5CF6' }}>Purple Dashed: </Text>Goals-Based GBWM (Net wealth remaining after dedicated major life milestones)
+          </Text>
         </View>
       )}
 
@@ -1266,5 +1639,81 @@ const styles = StyleSheet.create({
   takeawayBody: {
     fontSize: 11,
     lineHeight: 16,
+  },
+  rollingExplainerBox: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  explainerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  explainerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  explainerText: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  rollingCardsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  rollingMiniCard: {
+    flex: 1,
+    minWidth: 140,
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  miniCardTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  miniCardStat: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  miniCardSub: {
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  takeawayPill: {
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  takeawayPillText: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  comparisonGuideBanner: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  comparisonGuideRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  comparisonGuideTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  comparisonGuideText: {
+    fontSize: 11,
+    lineHeight: 18,
   },
 });

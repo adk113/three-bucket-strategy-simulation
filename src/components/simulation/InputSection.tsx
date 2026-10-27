@@ -643,7 +643,11 @@ export const InputSection: React.FC<InputSectionProps> = ({
               })}
             </View>
             <Text style={[styles.scenarioDescText, { color: colors.textMuted }]}>
-              Breaks down the timeline into overlapping {activeRollingWindow}-year windows to calculate the exact frequency of positive returns, worst-case, median, and best holding experience.
+              {activeRollingWindow === 3
+                ? '3-Year Window: Short-term equity holding block. Shows higher volatility spread between sharp pullbacks and bull rallies.'
+                : activeRollingWindow === 5
+                ? '5-Year Window (Recommended): Balanced horizon. Historically in US & India, 5Y equity holding blocks deliver positive returns >96% of the time.'
+                : '10-Year Window: Long-term compounding. Central Limit Theorem compresses variance—virtually 0% historical chance of a negative return.'}
             </Text>
           </View>
         )}

@@ -319,12 +319,18 @@ export function runRollingReturnsAnalysis(
   );
 
   // Build 3 distinct trajectories: Worst Rolling, Median Rolling, and Best Rolling
-  const buildTraj = (b3AnnualReturn: number) => {
-    const returns = Array.from({ length: horizon }, () => ({
-      b1: b1Return / 100,
-      b2: b2Return / 100,
-      b3: b3AnnualReturn / 100,
-    }));
+  // Realistic rolling regime: The portfolio experiences the window's annualized return
+  // during the first `windowYears` (holding block), then mean-reverts to long-term compound return.
+  const buildTraj = (b3AnnualReturnDuringWindow: number) => {
+    const returns = Array.from({ length: horizon }, (_, yrIdx) => {
+      const isWithinWindow = yrIdx < windowYears;
+      const b3Rate = isWithinWindow ? b3AnnualReturnDuringWindow : meanB3;
+      return {
+        b1: b1Return / 100,
+        b2: b2Return / 100,
+        b3: b3Rate / 100,
+      };
+    });
     const res = runDeterministicSimulation(inputs, returns);
     return res.map((r) => r.totalCorpus);
   };
