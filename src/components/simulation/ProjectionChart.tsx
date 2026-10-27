@@ -96,6 +96,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
   const [selectedYearIndex, setSelectedYearIndex] = useState<number>(
     Math.min(displayHorizon - 1, 9)
   );
+  const [isTransferScheduleOpen, setIsTransferScheduleOpen] = useState<boolean>(false);
 
   // Scalable slice up to 80 years
   const activeDisplayHorizon =
@@ -1251,8 +1252,248 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({
               </Text>
             </View>
           </View>
+
+          {/* Yearly Bucket-to-Bucket Refill & Transfer Box */}
+          <View style={[styles.transferBreakdownBox, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}>
+            <View style={styles.transferHeaderRow}>
+              <ArrowRightLeft size={14} color={colors.accent} style={{ marginRight: 6 }} />
+              <Text style={[styles.transferHeaderTitle, { color: colors.textPrimary }]}>
+                Year {selectedData.year} Bucket Refill & Cash Flow Protocol
+              </Text>
+            </View>
+
+            <View style={styles.transferRowsContainer}>
+              {/* Row 1: Living Expense Debit */}
+              <View style={styles.transferDetailRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={[styles.transferIconDot, { backgroundColor: '#F43F5E' }]} />
+                  <Text style={[styles.transferActionLabel, { color: colors.textSecondary }]}>
+                    Annual Living Expense Paid:
+                  </Text>
+                </View>
+                <Text style={[styles.transferActionVal, { color: '#F43F5E' }]}>
+                  −{formatCurrency(selectedData.withdrawalAmount, baseCountry)} (from B1 Cash)
+                </Text>
+              </View>
+
+              {/* Row 2: B2 to B1 Cash Refill */}
+              <View style={styles.transferDetailRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={[styles.transferIconDot, { backgroundColor: PALETTE.bucket2.base }]} />
+                  <Text style={[styles.transferActionLabel, { color: colors.textSecondary }]}>
+                    Bucket 2 → Bucket 1 Refill:
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.transferActionVal,
+                    { color: selectedData.bucket1RefilledFromB2 > 0 ? colors.accent : colors.textMuted },
+                  ]}
+                >
+                  {selectedData.bucket1RefilledFromB2 > 0
+                    ? `+${formatCurrency(selectedData.bucket1RefilledFromB2, baseCountry)} (Cash Target Restored)`
+                    : '₹0 (Target Floor Maintained)'}
+                </Text>
+              </View>
+
+              {/* Row 3: B3 to B2 Equity Harvest / Bear Defense */}
+              <View style={styles.transferDetailRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={[styles.transferIconDot, { backgroundColor: PALETTE.bucket3.base }]} />
+                  <Text style={[styles.transferActionLabel, { color: colors.textSecondary }]}>
+                    Bucket 3 → Bucket 2 Harvest:
+                  </Text>
+                </View>
+                {selectedData.bearMarketDefenseActive ? (
+                  <Text style={[styles.transferActionVal, { color: '#F59E0B' }]}>
+                    🛡️ ₹0 (Bear Defense Active: Equities Protected)
+                  </Text>
+                ) : (
+                  <Text
+                    style={[
+                      styles.transferActionVal,
+                      { color: selectedData.bucket2RefilledFromB3 > 0 ? '#10B981' : colors.textMuted },
+                    ]}
+                  >
+                    {selectedData.bucket2RefilledFromB3 > 0
+                      ? `+${formatCurrency(selectedData.bucket2RefilledFromB3, baseCountry)} (Harvested to Buffer)`
+                      : '₹0 (Buffer Target Satisfied)'}
+                  </Text>
+                )}
+              </View>
+
+              {/* Row 4: Transaction Friction if any */}
+              {selectedData.rebalanceFrictionCost > 0 && (
+                <View style={styles.transferDetailRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={[styles.transferIconDot, { backgroundColor: colors.textMuted }]} />
+                    <Text style={[styles.transferActionLabel, { color: colors.textMuted }]}>
+                      Rebalancing Friction / Slippage:
+                    </Text>
+                  </View>
+                  <Text style={[styles.transferActionVal, { color: colors.textMuted }]}>
+                    −{formatCurrency(selectedData.rebalanceFrictionCost, baseCountry)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
         </View>
       )}
+
+      {/* Year-on-Year Bucket Transfer Schedule (All Years Table) */}
+      <View
+        style={[
+          styles.scheduleContainer,
+          {
+            backgroundColor: colors.surfaceElevated,
+            borderColor: colors.borderSubtle,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => setIsTransferScheduleOpen(!isTransferScheduleOpen)}
+          style={[styles.scheduleToggleBtn, { backgroundColor: colors.surfaceElevated }]}
+          activeOpacity={0.7}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+            <ArrowRightLeft size={16} color={colors.accent} style={{ marginRight: 8 }} />
+            <Text style={[styles.scheduleToggleTitle, { color: colors.textPrimary }]}>
+              Year-on-Year Bucket Transfer Schedule ({displayedResults.length} Years)
+            </Text>
+          </View>
+          <Text style={[styles.scheduleToggleSub, { color: colors.accent }]}>
+            {isTransferScheduleOpen ? 'Hide Schedule ▲' : 'View Schedule (All Years) ▼'}
+          </Text>
+        </TouchableOpacity>
+
+        {isTransferScheduleOpen && (
+          <View style={[styles.scheduleContentBox, { borderTopColor: colors.borderSubtle }]}>
+            <Text style={[styles.scheduleHelpText, { color: colors.textMuted }]}>
+              Chronological year-on-year waterfall: living expense debits, B2→B1 cash floor refills, B3→B2 equity harvests, and bear market defense activation. Tap any row to inspect in chart.
+            </Text>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.tableScrollWrap}>
+              <View>
+                {/* Table Header */}
+                <View style={[styles.tableHeaderRow, { backgroundColor: colors.surfaceCard, borderBottomColor: colors.borderSubtle }]}>
+                  <Text style={[styles.tableHeaderCol, { width: 85, color: colors.textMuted }]}>Year</Text>
+                  <Text style={[styles.tableHeaderCol, { width: 110, color: colors.textMuted }]}>Expense Paid</Text>
+                  <Text style={[styles.tableHeaderCol, { width: 125, color: colors.textMuted }]}>B2 → B1 Refill</Text>
+                  <Text style={[styles.tableHeaderCol, { width: 135, color: colors.textMuted }]}>B3 → B2 Harvest</Text>
+                  <Text style={[styles.tableHeaderCol, { width: 120, color: colors.textMuted }]}>Protocol Action</Text>
+                  <Text style={[styles.tableHeaderCol, { width: 200, color: colors.textMuted }]}>Ending Balances (B1/B2/B3)</Text>
+                  <Text style={[styles.tableHeaderCol, { width: 125, color: colors.textMuted }]}>Total Corpus</Text>
+                </View>
+
+                {/* Table Rows */}
+                {displayedResults.map((r, idx) => {
+                  const isCurSelected = idx === safeYearIndex;
+                  return (
+                    <TouchableOpacity
+                      key={r.year}
+                      onPress={() => setSelectedYearIndex(idx)}
+                      style={[
+                        styles.tableRow,
+                        {
+                          backgroundColor: isCurSelected ? colors.accent + '15' : idx % 2 === 0 ? 'transparent' : colors.surfaceCard + '40',
+                          borderBottomColor: colors.borderSubtle,
+                        },
+                      ]}
+                      activeOpacity={0.65}
+                    >
+                      {/* Col 1: Year */}
+                      <View style={{ width: 85, flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[styles.tableColText, { color: isCurSelected ? colors.accent : colors.textPrimary, fontWeight: '700' }]}>
+                          Y{r.year} <Text style={{ fontSize: 10, color: colors.textMuted }}>({r.calendarYear})</Text>
+                        </Text>
+                      </View>
+
+                      {/* Col 2: Expense Paid */}
+                      <View style={{ width: 110 }}>
+                        <Text style={[styles.tableColText, { color: '#F43F5E' }]}>
+                          −{formatCurrency(r.withdrawalAmount, baseCountry)}
+                        </Text>
+                      </View>
+
+                      {/* Col 3: B2 -> B1 Refill */}
+                      <View style={{ width: 125 }}>
+                        <Text
+                          style={[
+                            styles.tableColText,
+                            { color: r.bucket1RefilledFromB2 > 0 ? colors.accent : colors.textMuted },
+                          ]}
+                        >
+                          {r.bucket1RefilledFromB2 > 0 ? `+${formatCurrency(r.bucket1RefilledFromB2, baseCountry)}` : '—'}
+                        </Text>
+                      </View>
+
+                      {/* Col 4: B3 -> B2 Harvest */}
+                      <View style={{ width: 135 }}>
+                        {r.bearMarketDefenseActive ? (
+                          <Text style={[styles.tableColText, { color: '#F59E0B', fontWeight: '700' }]}>
+                            🛡️ Bear Defense
+                          </Text>
+                        ) : (
+                          <Text
+                            style={[
+                              styles.tableColText,
+                              { color: r.bucket2RefilledFromB3 > 0 ? '#10B981' : colors.textMuted },
+                            ]}
+                          >
+                            {r.bucket2RefilledFromB3 > 0 ? `+${formatCurrency(r.bucket2RefilledFromB3, baseCountry)}` : '—'}
+                          </Text>
+                        )}
+                      </View>
+
+                      {/* Col 5: Protocol Action Badge */}
+                      <View style={{ width: 120 }}>
+                        {r.isDepleted ? (
+                          <View style={[styles.statusBadge, { backgroundColor: '#EF444420' }]}>
+                            <Text style={[styles.statusBadgeText, { color: '#EF4444' }]}>Depleted</Text>
+                          </View>
+                        ) : r.bearMarketDefenseActive ? (
+                          <View style={[styles.statusBadge, { backgroundColor: '#F59E0B20' }]}>
+                            <Text style={[styles.statusBadgeText, { color: '#F59E0B' }]}>🛡️ Equities Saved</Text>
+                          </View>
+                        ) : r.bucket2RefilledFromB3 > 0 ? (
+                          <View style={[styles.statusBadge, { backgroundColor: '#10B98120' }]}>
+                            <Text style={[styles.statusBadgeText, { color: '#10B981' }]}>Equity Harvest</Text>
+                          </View>
+                        ) : r.bucket1RefilledFromB2 > 0 ? (
+                          <View style={[styles.statusBadge, { backgroundColor: colors.accent + '20' }]}>
+                            <Text style={[styles.statusBadgeText, { color: colors.accent }]}>Cash Refilled</Text>
+                          </View>
+                        ) : (
+                          <View style={[styles.statusBadge, { backgroundColor: colors.surfaceCard }]}>
+                            <Text style={[styles.statusBadgeText, { color: colors.textMuted }]}>Floors Met</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Col 6: Bucket Breakdown */}
+                      <View style={{ width: 200 }}>
+                        <Text style={[styles.tableColText, { fontSize: 10, color: colors.textSecondary }]}>
+                          <Text style={{ color: PALETTE.bucket1.base }}>B1:</Text> {formatShortAxis(r.bucket1, baseCountry)} |{' '}
+                          <Text style={{ color: PALETTE.bucket2.base }}>B2:</Text> {formatShortAxis(r.bucket2, baseCountry)} |{' '}
+                          <Text style={{ color: PALETTE.bucket3.base }}>B3:</Text> {formatShortAxis(r.bucket3, baseCountry)}
+                        </Text>
+                      </View>
+
+                      {/* Col 7: Total Corpus */}
+                      <View style={{ width: 125 }}>
+                        <Text style={[styles.tableColText, { color: colors.textPrimary, fontWeight: '700' }]}>
+                          {formatCurrency(r.totalCorpus, baseCountry)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+      </View>
 
       {/* Educational Guide for Rolling Returns Holding Block Windows */}
       {selectedModel === 'rolling_returns' && rollingReturns && (
@@ -1715,5 +1956,111 @@ const styles = StyleSheet.create({
   comparisonGuideText: {
     fontSize: 11,
     lineHeight: 18,
+  },
+  transferBreakdownBox: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  transferHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  transferHeaderTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  transferRowsContainer: {
+    gap: 6,
+  },
+  transferDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  transferIconDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  transferActionLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  transferActionVal: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  scheduleContainer: {
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  scheduleToggleBtn: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+  },
+  scheduleToggleTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  scheduleToggleSub: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  scheduleContentBox: {
+    borderTopWidth: 1,
+    padding: 10,
+  },
+  scheduleHelpText: {
+    fontSize: 11,
+    marginBottom: 8,
+    fontStyle: 'italic',
+    lineHeight: 16,
+  },
+  tableScrollWrap: {
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+  },
+  tableHeaderCol: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    borderBottomWidth: 0.5,
+  },
+  tableColText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  statusBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  statusBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
   },
 });

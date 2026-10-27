@@ -28,6 +28,9 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
+  RotateCcw,
+  Percent,
+  TrendingUp,
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { DatePickerInput } from '../common/DatePickerInput';
@@ -374,6 +377,82 @@ export const InputSection: React.FC<InputSectionProps> = ({
       });
     }
     onChangeInputs({ ...inputs, multiCountryAllocations: list });
+  };
+
+  // Bucket Expected ROI (% Annual Returns) Logic
+  const countryProfile =
+    COUNTRY_PROFILES[inputs.baseCountry || 'IN'] || COUNTRY_PROFILES.IN;
+  const benchmarkB1 = countryProfile.bucket1.nominalReturnMean;
+  const benchmarkB2 = countryProfile.bucket2.nominalReturnMean;
+  const benchmarkB3 = Number(blendedB3.blendedReturn.toFixed(2));
+
+  const currentB1Roi =
+    inputs.mode === 'manual'
+      ? (inputs.manualReturns?.bucket1 ?? benchmarkB1)
+      : benchmarkB1;
+  const currentB2Roi =
+    inputs.mode === 'manual'
+      ? (inputs.manualReturns?.bucket2 ?? benchmarkB2)
+      : benchmarkB2;
+  const currentB3Roi =
+    inputs.mode === 'manual'
+      ? (inputs.manualReturns?.bucket3 ?? benchmarkB3)
+      : benchmarkB3;
+
+  const handleUpdateBucketRoi = (bucket: 1 | 2 | 3, valueStr: string) => {
+    const clean = valueStr.replace(/[^0-9.-]/g, '');
+    const num = parseFloat(clean);
+    const safeVal = isNaN(num) ? 0 : Math.min(50, Math.max(-20, Number(num.toFixed(2))));
+
+    onChangeInputs({
+      ...inputs,
+      mode: 'manual',
+      manualReturns: {
+        bucket1: bucket === 1 ? safeVal : currentB1Roi,
+        bucket2: bucket === 2 ? safeVal : currentB2Roi,
+        bucket3: bucket === 3 ? safeVal : currentB3Roi,
+      },
+    });
+  };
+
+  const handleAdjustBucketRoi = (bucket: 1 | 2 | 3, delta: number) => {
+    const curVal = bucket === 1 ? currentB1Roi : bucket === 2 ? currentB2Roi : currentB3Roi;
+    const newVal = Number((curVal + delta).toFixed(2));
+    const safeVal = Math.min(50, Math.max(-20, newVal));
+
+    onChangeInputs({
+      ...inputs,
+      mode: 'manual',
+      manualReturns: {
+        bucket1: bucket === 1 ? safeVal : currentB1Roi,
+        bucket2: bucket === 2 ? safeVal : currentB2Roi,
+        bucket3: bucket === 3 ? safeVal : currentB3Roi,
+      },
+    });
+  };
+
+  const handleResetBucketRoiToBenchmark = () => {
+    onChangeInputs({
+      ...inputs,
+      mode: 'historical',
+      manualReturns: {
+        bucket1: benchmarkB1,
+        bucket2: benchmarkB2,
+        bucket3: benchmarkB3,
+      },
+    });
+  };
+
+  const handleSetCustomRoiMode = () => {
+    onChangeInputs({
+      ...inputs,
+      mode: 'manual',
+      manualReturns: {
+        bucket1: currentB1Roi,
+        bucket2: currentB2Roi,
+        bucket3: currentB3Roi,
+      },
+    });
   };
 
   const activeModel = inputs.selectedModel || 'monte_carlo';
@@ -1344,6 +1423,340 @@ export const InputSection: React.FC<InputSectionProps> = ({
         </View>
       </View>
 
+      {/* Bucket Expected ROI (% Annual Returns) Configuration */}
+      <View style={[styles.roiSection, { borderTopColor: colors.borderSubtle }]}>
+        <View style={styles.roiHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flex: 1, flexWrap: 'wrap', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 200 }}>
+              <TrendingUp size={18} color={colors.accent} style={{ marginRight: 8 }} />
+              <View>
+                <Text style={[styles.roiTitle, { color: colors.textPrimary }]}>
+                  Bucket Expected ROI (% Annual Returns)
+                </Text>
+                <Text style={[styles.roiSubtitle, { color: colors.textMuted }]}>
+                  Customize annual growth rates per bucket or rely on empirical country benchmarks
+                </Text>
+              </View>
+            </View>
+
+            {/* Mode Switcher */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <TouchableOpacity
+                onPress={handleResetBucketRoiToBenchmark}
+                style={[
+                  styles.roiModePill,
+                  {
+                    backgroundColor: inputs.mode !== 'manual' ? colors.accent : colors.surfaceElevated,
+                    borderColor: inputs.mode !== 'manual' ? colors.accent : colors.borderSubtle,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.roiModePillText,
+                    { color: inputs.mode !== 'manual' ? '#FFFFFF' : colors.textSecondary },
+                  ]}
+                >
+                  🏛️ Benchmarks
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleSetCustomRoiMode}
+                style={[
+                  styles.roiModePill,
+                  {
+                    backgroundColor: inputs.mode === 'manual' ? colors.accent : colors.surfaceElevated,
+                    borderColor: inputs.mode === 'manual' ? colors.accent : colors.borderSubtle,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.roiModePillText,
+                    { color: inputs.mode === 'manual' ? '#FFFFFF' : colors.textSecondary },
+                  ]}
+                >
+                  ⚙️ Custom ROI
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {inputs.mode === 'manual' && (
+          <View style={[styles.customRoiAlert, { backgroundColor: colors.accent + '12', borderColor: colors.accent + '40' }]}>
+            <Text style={[styles.customRoiAlertText, { color: colors.accent }]}>
+              Custom Mode Active: Using your expected ROI overrides across all annual waterfall updates and Monte Carlo trajectories.
+            </Text>
+            <TouchableOpacity
+              onPress={handleResetBucketRoiToBenchmark}
+              style={[styles.resetRoiBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderSubtle }]}
+            >
+              <RotateCcw size={12} color={colors.textSecondary} style={{ marginRight: 4 }} />
+              <Text style={[styles.resetRoiBtnText, { color: colors.textSecondary }]}>Reset to Benchmarks</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <View style={styles.roiCardsGrid}>
+          {/* Bucket 1 ROI Card */}
+          <View style={[styles.roiBucketCard, { backgroundColor: colors.surfaceElevated, borderColor: PALETTE.bucket1.base + '50' }]}>
+            <View style={styles.roiCardTop}>
+              <View style={[styles.roiBucketBadge, { backgroundColor: PALETTE.bucket1.base + '25' }]}>
+                <Text style={[styles.roiBucketBadgeText, { color: PALETTE.bucket1.base }]}>Bucket 1 (Cash)</Text>
+              </View>
+              <Text style={[styles.benchmarkRefText, { color: colors.textMuted }]}>
+                Benchmark: {benchmarkB1}%
+              </Text>
+            </View>
+
+            <Text style={[styles.roiBucketDesc, { color: colors.textSecondary }]}>
+              Liquid cash, FD, high-yield savings (0–3 Years Runway)
+            </Text>
+
+            {/* Stepper + Input */}
+            <View style={styles.roiControlRow}>
+              <TouchableOpacity
+                onPress={() => handleAdjustBucketRoi(1, -0.25)}
+                style={[styles.roiStepBtn, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}
+              >
+                <Text style={[styles.roiStepBtnText, { color: colors.textPrimary }]}>−</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.roiInputWrap, { backgroundColor: colors.surfaceCard, borderColor: colors.border }]}>
+                <TextInput
+                  value={currentB1Roi.toString()}
+                  onChangeText={(val) => handleUpdateBucketRoi(1, val)}
+                  keyboardType="decimal-pad"
+                  style={[styles.roiInput, { color: colors.textPrimary }]}
+                  placeholder="5.5"
+                  placeholderTextColor={colors.textMuted}
+                />
+                <Text style={[styles.roiUnit, { color: colors.textMuted }]}>% p.a.</Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => handleAdjustBucketRoi(1, 0.25)}
+                style={[styles.roiStepBtn, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}
+              >
+                <Text style={[styles.roiStepBtnText, { color: colors.textPrimary }]}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Presets */}
+            <View style={styles.roiPresetsRow}>
+              {[4.5, 5.5, 6.5, 7.5].map((preset) => (
+                <TouchableOpacity
+                  key={preset}
+                  onPress={() => handleUpdateBucketRoi(1, preset.toString())}
+                  style={[
+                    styles.roiPresetChip,
+                    {
+                      backgroundColor: currentB1Roi === preset ? PALETTE.bucket1.base : colors.surfaceCard,
+                      borderColor: currentB1Roi === preset ? PALETTE.bucket1.base : colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.roiPresetChipText,
+                      { color: currentB1Roi === preset ? '#FFFFFF' : colors.textSecondary },
+                    ]}
+                  >
+                    {preset}%
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Real Return Badge */}
+            <View style={[styles.realReturnBadge, { backgroundColor: colors.surfaceCard }]}>
+              <Text style={[styles.realReturnLabel, { color: colors.textMuted }]}>Real Return (Net of {inputs.inflationRate}% Infl):</Text>
+              <Text
+                style={[
+                  styles.realReturnVal,
+                  { color: currentB1Roi >= inputs.inflationRate ? '#10B981' : '#F59E0B' },
+                ]}
+              >
+                {currentB1Roi >= inputs.inflationRate ? '+' : ''}
+                {(currentB1Roi - inputs.inflationRate).toFixed(1)}% p.a.
+              </Text>
+            </View>
+          </View>
+
+          {/* Bucket 2 ROI Card */}
+          <View style={[styles.roiBucketCard, { backgroundColor: colors.surfaceElevated, borderColor: PALETTE.bucket2.base + '50' }]}>
+            <View style={styles.roiCardTop}>
+              <View style={[styles.roiBucketBadge, { backgroundColor: PALETTE.bucket2.base + '25' }]}>
+                <Text style={[styles.roiBucketBadgeText, { color: PALETTE.bucket2.base }]}>Bucket 2 (Income / Debt)</Text>
+              </View>
+              <Text style={[styles.benchmarkRefText, { color: colors.textMuted }]}>
+                Benchmark: {benchmarkB2}%
+              </Text>
+            </View>
+
+            <Text style={[styles.roiBucketDesc, { color: colors.textSecondary }]}>
+              Short/medium debt, corporate bonds, target maturity (3–10 Years Buffer)
+            </Text>
+
+            {/* Stepper + Input */}
+            <View style={styles.roiControlRow}>
+              <TouchableOpacity
+                onPress={() => handleAdjustBucketRoi(2, -0.25)}
+                style={[styles.roiStepBtn, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}
+              >
+                <Text style={[styles.roiStepBtnText, { color: colors.textPrimary }]}>−</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.roiInputWrap, { backgroundColor: colors.surfaceCard, borderColor: colors.border }]}>
+                <TextInput
+                  value={currentB2Roi.toString()}
+                  onChangeText={(val) => handleUpdateBucketRoi(2, val)}
+                  keyboardType="decimal-pad"
+                  style={[styles.roiInput, { color: colors.textPrimary }]}
+                  placeholder="8.0"
+                  placeholderTextColor={colors.textMuted}
+                />
+                <Text style={[styles.roiUnit, { color: colors.textMuted }]}>% p.a.</Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => handleAdjustBucketRoi(2, 0.25)}
+                style={[styles.roiStepBtn, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}
+              >
+                <Text style={[styles.roiStepBtnText, { color: colors.textPrimary }]}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Presets */}
+            <View style={styles.roiPresetsRow}>
+              {[6.5, 7.5, 8.5, 9.5].map((preset) => (
+                <TouchableOpacity
+                  key={preset}
+                  onPress={() => handleUpdateBucketRoi(2, preset.toString())}
+                  style={[
+                    styles.roiPresetChip,
+                    {
+                      backgroundColor: currentB2Roi === preset ? PALETTE.bucket2.base : colors.surfaceCard,
+                      borderColor: currentB2Roi === preset ? PALETTE.bucket2.base : colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.roiPresetChipText,
+                      { color: currentB2Roi === preset ? '#FFFFFF' : colors.textSecondary },
+                    ]}
+                  >
+                    {preset}%
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Real Return Badge */}
+            <View style={[styles.realReturnBadge, { backgroundColor: colors.surfaceCard }]}>
+              <Text style={[styles.realReturnLabel, { color: colors.textMuted }]}>Real Return (Net of {inputs.inflationRate}% Infl):</Text>
+              <Text
+                style={[
+                  styles.realReturnVal,
+                  { color: currentB2Roi >= inputs.inflationRate ? '#10B981' : '#F59E0B' },
+                ]}
+              >
+                {currentB2Roi >= inputs.inflationRate ? '+' : ''}
+                {(currentB2Roi - inputs.inflationRate).toFixed(1)}% p.a.
+              </Text>
+            </View>
+          </View>
+
+          {/* Bucket 3 ROI Card */}
+          <View style={[styles.roiBucketCard, { backgroundColor: colors.surfaceElevated, borderColor: PALETTE.bucket3.base + '50' }]}>
+            <View style={styles.roiCardTop}>
+              <View style={[styles.roiBucketBadge, { backgroundColor: PALETTE.bucket3.base + '25' }]}>
+                <Text style={[styles.roiBucketBadgeText, { color: PALETTE.bucket3.base }]}>Bucket 3 (Growth Equities)</Text>
+              </View>
+              <Text style={[styles.benchmarkRefText, { color: colors.textMuted }]}>
+                Blended: {benchmarkB3}%
+              </Text>
+            </View>
+
+            <Text style={[styles.roiBucketDesc, { color: colors.textSecondary }]}>
+              Multi-country equities, global ETFs, wealth growth engine (10+ Years)
+            </Text>
+
+            {/* Stepper + Input */}
+            <View style={styles.roiControlRow}>
+              <TouchableOpacity
+                onPress={() => handleAdjustBucketRoi(3, -0.5)}
+                style={[styles.roiStepBtn, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}
+              >
+                <Text style={[styles.roiStepBtnText, { color: colors.textPrimary }]}>−</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.roiInputWrap, { backgroundColor: colors.surfaceCard, borderColor: colors.border }]}>
+                <TextInput
+                  value={currentB3Roi.toString()}
+                  onChangeText={(val) => handleUpdateBucketRoi(3, val)}
+                  keyboardType="decimal-pad"
+                  style={[styles.roiInput, { color: colors.textPrimary }]}
+                  placeholder="12.0"
+                  placeholderTextColor={colors.textMuted}
+                />
+                <Text style={[styles.roiUnit, { color: colors.textMuted }]}>% p.a.</Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => handleAdjustBucketRoi(3, 0.5)}
+                style={[styles.roiStepBtn, { backgroundColor: colors.surfaceCard, borderColor: colors.borderSubtle }]}
+              >
+                <Text style={[styles.roiStepBtnText, { color: colors.textPrimary }]}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Presets */}
+            <View style={styles.roiPresetsRow}>
+              {[10.0, 11.5, 12.5, 14.0].map((preset) => (
+                <TouchableOpacity
+                  key={preset}
+                  onPress={() => handleUpdateBucketRoi(3, preset.toString())}
+                  style={[
+                    styles.roiPresetChip,
+                    {
+                      backgroundColor: currentB3Roi === preset ? PALETTE.bucket3.base : colors.surfaceCard,
+                      borderColor: currentB3Roi === preset ? PALETTE.bucket3.base : colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.roiPresetChipText,
+                      { color: currentB3Roi === preset ? '#FFFFFF' : colors.textSecondary },
+                    ]}
+                  >
+                    {preset}%
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Real Return Badge */}
+            <View style={[styles.realReturnBadge, { backgroundColor: colors.surfaceCard }]}>
+              <Text style={[styles.realReturnLabel, { color: colors.textMuted }]}>Real Return (Net of {inputs.inflationRate}% Infl):</Text>
+              <Text
+                style={[
+                  styles.realReturnVal,
+                  { color: currentB3Roi >= inputs.inflationRate ? '#10B981' : '#F43F5E' },
+                ]}
+              >
+                {currentB3Roi >= inputs.inflationRate ? '+' : ''}
+                {(currentB3Roi - inputs.inflationRate).toFixed(1)}% p.a.
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
       {/* Unified Horizon Selection Modal */}
       <Modal
         visible={isHorizonModalOpen}
@@ -2306,6 +2719,166 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: 6,
     borderWidth: 1,
+  },
+  roiSection: {
+    marginTop: 18,
+    paddingTop: 16,
+    borderTopWidth: 1,
+  },
+  roiHeader: {
+    marginBottom: 8,
+  },
+  roiTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  roiSubtitle: {
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  roiModePill: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  roiModePillText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  customRoiAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  customRoiAlertText: {
+    fontSize: 12,
+    flex: 1,
+    fontWeight: '500',
+    minWidth: 200,
+  },
+  resetRoiBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  resetRoiBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  roiCardsGrid: {
+    marginTop: 12,
+    gap: 12,
+  },
+  roiBucketCard: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  roiCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  roiBucketBadge: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  roiBucketBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  benchmarkRefText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  roiBucketDesc: {
+    fontSize: 11,
+    marginBottom: 10,
+    lineHeight: 15,
+  },
+  roiControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  roiStepBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roiStepBtnText: {
+    fontSize: 20,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  roiInputWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+  },
+  roiInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  roiUnit: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  roiPresetsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  roiPresetChip: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  roiPresetChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  realReturnBadge: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    marginTop: 2,
+  },
+  realReturnLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  realReturnVal: {
+    fontSize: 12,
+    fontWeight: '800',
   },
 });
 

@@ -220,9 +220,18 @@ export function runHistoricalBacktest(
     inputs.multiCountryAllocations
   );
 
-  const baseB1 = countryProfile.bucket1.nominalReturnMean / 100;
-  const baseB2 = countryProfile.bucket2.nominalReturnMean / 100;
-  const baseB3 = blendedB3.blendedReturn / 100;
+  const baseB1 =
+    (inputs.mode === 'manual' && inputs.manualReturns
+      ? inputs.manualReturns.bucket1
+      : countryProfile.bucket1.nominalReturnMean) / 100;
+  const baseB2 =
+    (inputs.mode === 'manual' && inputs.manualReturns
+      ? inputs.manualReturns.bucket2
+      : countryProfile.bucket2.nominalReturnMean) / 100;
+  const baseB3 =
+    (inputs.mode === 'manual' && inputs.manualReturns
+      ? inputs.manualReturns.bucket3
+      : blendedB3.blendedReturn) / 100;
 
   // Build custom returns: crisis period followed by normalized long-term trend
   const customReturns: { b1: number; b2: number; b3: number }[] = [];
@@ -295,10 +304,19 @@ export function runRollingReturnsAnalysis(
     inputs.multiCountryAllocations
   );
 
-  const meanB3 = blendedB3.blendedReturn;
+  const meanB3 =
+    inputs.mode === 'manual' && inputs.manualReturns
+      ? inputs.manualReturns.bucket3
+      : blendedB3.blendedReturn;
   const stdB3 = blendedB3.blendedStdDev;
-  const b1Return = countryProfile.bucket1.nominalReturnMean;
-  const b2Return = countryProfile.bucket2.nominalReturnMean;
+  const b1Return =
+    inputs.mode === 'manual' && inputs.manualReturns
+      ? inputs.manualReturns.bucket1
+      : countryProfile.bucket1.nominalReturnMean;
+  const b2Return =
+    inputs.mode === 'manual' && inputs.manualReturns
+      ? inputs.manualReturns.bucket2
+      : countryProfile.bucket2.nominalReturnMean;
 
   // Approximate historical rolling distribution for chosen window
   // Longer holding periods significantly compress return variance (CLT)
